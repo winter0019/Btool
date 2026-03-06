@@ -1,0 +1,5 @@
+{
+  "name": "NaijaLearn: Interactive Education",
+  "description": "An educational platform for Nigerian students (Primary to SSS) featuring interactive cartoons, cultural lessons, and AI-powered engagement monitoring.",
+  "requestFramePermissions": ["camera", "microphone"]
+}

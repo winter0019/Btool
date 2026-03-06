@@ -1,0 +1,249 @@
+import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { EducationLevel, Subject } from "../types";
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (retries <= 0) throw err;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return withRetry(fn, retries - 1, delay * 2);
+  }
+}
+
+export async function generateLesson(level: EducationLevel, subject: Subject, topic: string) {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  
+  const fetchLesson = () => ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `You are an expert teacher for Nigerian students at the ${level} level. 
+    Create a fun, interactive lesson on the topic: "${topic}" for the subject: "${subject.name}".
+    
+    Guidelines:
+    - For Primary 1-3: Use very simple words, phonics-based learning, storytelling, and colorful cartoon-like descriptions. Focus on foundational concepts. Character: A fun cartoon like Tom & Jerry, Spiderman, or a friendly animal.
+    - For Primary 4-5: Use simple words, storytelling, and cartoon-like descriptions. Focus on practical applications. Character: An adventurous character like a Ninja Turtle or a friendly Shark.
+    - For JSS: Use clear explanations with real-world examples from Nigeria. Character: A funny or relatable character like Mr. Bean or a local hero.
+    - For SSS: Use detailed concepts, critical thinking questions, and academic rigor. Character: A famous person in the field (e.g., Einstein for Science, Wole Soyinka for Literature, Ben Enwonwu for Art).
+    - Include a "Character Persona" (name and role) and a "Character Greeting" that they say to the student.
+    - The character should be the one "teaching" the lesson in the content, using their unique personality and catchphrases.
+    - Include a "Cartoon Scene" description featuring the character.
+    - Include an "Interactive Demo" idea.
+    - Keep it engaging and culturally relevant to Nigeria.`,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          content: { type: Type.STRING, description: "The main lesson text in Markdown" },
+          characterPersona: { type: Type.STRING, description: "The name and role of the character buddy (e.g., 'Spiderman, your Science Buddy')" },
+          characterGreeting: { type: Type.STRING, description: "A friendly greeting from the character" },
+          cartoonDescription: { type: Type.STRING, description: "Description of a cartoon scene to accompany the lesson" },
+          interactiveDemo: { type: Type.STRING, description: "A simple interactive task for the student" },
+          quiz: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                question: { type: Type.STRING },
+                options: { type: Type.ARRAY, items: { type: Type.STRING }, description: "At least 3 multiple choice options" },
+                answer: { type: Type.STRING, description: "The correct option from the options array" }
+              },
+              required: ["question", "options", "answer"]
+            }
+          }
+        },
+        required: ["title", "content", "characterPersona", "characterGreeting", "cartoonDescription", "interactiveDemo", "quiz"]
+      }
+    }
+  });
+
+  const response = await withRetry(fetchLesson);
+
+  let lessonData;
+  try {
+    lessonData = JSON.parse(response.text || "{}");
+  } catch (err) {
+    console.error("Failed to parse AI response:", err);
+    return {
+      title: "Lesson Error",
+      content: "Sorry, we had trouble preparing this lesson. Please try again.",
+      cartoonDescription: "A teacher looking confused at a computer.",
+      interactiveDemo: "Try refreshing the page.",
+      quiz: [],
+      cartoonImageUrl: "",
+      characterImageUrl: ""
+    };
+  }
+
+  // Generate a cartoon image based on the description and character
+  try {
+    const [sceneResponse, characterResponse] = await withRetry(() => Promise.all([
+      ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+          parts: [{ text: `A colorful, friendly illustration for a student. The scene features ${lessonData.characterPersona} teaching about ${lessonData.title}. Description: ${lessonData.cartoonDescription}. Style: Vibrant, educational, friendly, culturally relevant to Nigeria.` }],
+        },
+        config: { imageConfig: { aspectRatio: "16:9", imageSize: "1K" } }
+      }),
+      ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+          parts: [{ text: `A portrait of ${lessonData.characterPersona}. If it's a famous person, make it a respectful and accurate portrait. If it's a cartoon, make it vibrant and friendly. Style: Clean background, portrait, educational.` }],
+        },
+        config: { imageConfig: { aspectRatio: "1:1", imageSize: "512px" } }
+      })
+    ]));
+
+    for (const part of sceneResponse.candidates[0].content.parts) {
+      if (part.inlineData) {
+        lessonData.cartoonImageUrl = `data:image/png;base64,${part.inlineData.data}`;
+        break;
+      }
+    }
+
+    for (const part of characterResponse.candidates[0].content.parts) {
+      if (part.inlineData) {
+        lessonData.characterImageUrl = `data:image/png;base64,${part.inlineData.data}`;
+        break;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to generate images:", err);
+    lessonData.cartoonImageUrl = `https://picsum.photos/seed/${lessonData.title.replace(/\s/g, '')}/1200/675`;
+    lessonData.characterImageUrl = `https://picsum.photos/seed/${lessonData.characterPersona.replace(/\s/g, '')}/200/200`;
+  }
+
+  return lessonData;
+}
+
+export async function generateSpeech(text: string) {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  try {
+    const response = await withRetry(() => ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: `Say clearly and cheerfully for a student: ${text}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
+        },
+      },
+    }));
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (base64Audio) {
+      // Gemini TTS returns raw PCM 16-bit 24kHz. Browsers need a WAV header to play via src.
+      const pcmData = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0));
+      const wavHeader = new ArrayBuffer(44);
+      const view = new DataView(wavHeader);
+
+      // RIFF identifier
+      view.setUint32(0, 0x52494646, false);
+      // File length
+      view.setUint32(4, 36 + pcmData.length, true);
+      // RIFF type
+      view.setUint32(8, 0x57415645, false);
+      // Format chunk identifier
+      view.setUint32(12, 0x666d7420, false);
+      // Format chunk length
+      view.setUint32(16, 16, true);
+      // Sample format (1 is PCM)
+      view.setUint16(20, 1, true);
+      // Channel count (1 for mono)
+      view.setUint16(22, 1, true);
+      // Sample rate (24000)
+      view.setUint32(24, 24000, true);
+      // Byte rate (sample rate * block align)
+      view.setUint32(28, 24000 * 2, true);
+      // Block align (channel count * bytes per sample)
+      view.setUint16(32, 2, true);
+      // Bits per sample (16)
+      view.setUint16(34, 16, true);
+      // Data chunk identifier
+      view.setUint32(36, 0x64617461, false);
+      // Data chunk length
+      view.setUint32(40, pcmData.length, true);
+
+      const blob = new Blob([wavHeader, pcmData], { type: 'audio/wav' });
+      return URL.createObjectURL(blob);
+    }
+  } catch (err) {
+    console.error("TTS generation failed:", err);
+  }
+  return null;
+}
+
+export async function analyzeVoiceInput(userInput: string, context: string, characterName: string) {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  try {
+    const response = await withRetry(() => ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `The student said: "${userInput}". 
+      The context of the lesson is: "${context}".
+      The character teaching is: "${characterName}".
+      Evaluate if the student is correct, provide a gentle correction if needed, and give a helpful hint to improve their understanding. 
+      Also, provide specific feedback on their pronunciation and clarity of speech.
+      The feedback should be in the voice and personality of ${characterName}.
+      Keep the tone encouraging and suitable for a Nigerian student.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isCorrect: { type: Type.BOOLEAN },
+            feedback: { type: Type.STRING },
+            hint: { type: Type.STRING },
+            pronunciationFeedback: { type: Type.STRING, description: "Specific feedback on how to pronounce words better" },
+            clarityScore: { type: Type.INTEGER, description: "Score from 0 to 100 on how clear the speech was" }
+          },
+          required: ["isCorrect", "feedback", "hint", "pronunciationFeedback", "clarityScore"]
+        }
+      }
+    }));
+    return JSON.parse(response.text || "{}");
+  } catch (err) {
+    console.error("Voice analysis failed:", err);
+    return { isCorrect: false, feedback: "I couldn't quite hear that. Could you try again?", hint: "Try speaking clearly!" };
+  }
+}
+
+export async function analyzeEngagement(imageData: string) {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  try {
+    const response = await withRetry(() => ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: {
+        parts: [
+          { inlineData: { data: imageData.split(',')[1], mimeType: "image/jpeg" } },
+          { text: "Analyze the student's facial expression, eye contact, and posture in this image. Specifically assess: 1. Engagement level (0-100). 2. Primary emotion. 3. Confidence level (Low, Medium, High). 4. A brief, encouraging feedback message tailored to their state." }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            engagementScore: { type: Type.NUMBER, description: "Score from 0 to 100" },
+            emotion: { type: Type.STRING, description: "The detected primary emotion (e.g., Happy, Focused, Confused, Bored)" },
+            confidence: { type: Type.STRING, description: "Confidence level: Low, Medium, or High" },
+            feedback: { type: Type.STRING, description: "A supportive message for the student" }
+          },
+          required: ["engagementScore", "emotion", "confidence", "feedback"]
+        }
+      }
+    }));
+
+    return JSON.parse(response.text || "{}");
+  } catch (err) {
+    console.error("Failed to analyze engagement:", err);
+    return {
+      engagementScore: 50,
+      emotion: "neutral",
+      confidence: "Medium",
+      feedback: "Keep going! You're doing great."
+    };
+  }
+}
