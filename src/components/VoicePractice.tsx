@@ -84,32 +84,35 @@ export const VoicePractice: React.FC<VoicePracticeProps> = ({ context, character
   };
 
   return (
-    <div className="bg-white p-4 md:p-6 rounded-[2rem] shadow-sm border border-slate-100">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
-            <Mic size={20} />
+    <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center space-x-4">
+          <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-100">
+            <Mic size={24} />
           </div>
-          <h3 className="font-bold text-slate-800 text-sm md:text-base">Voice Practice</h3>
+          <div>
+            <h3 className="font-black text-slate-900 uppercase tracking-tight">Voice Mission</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Speak to your tutor</p>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Speak your answer</span>
-          <Sparkles size={14} className="text-indigo-400" />
+        <div className="flex items-center space-x-2 bg-indigo-50 px-3 py-1 rounded-full">
+          <Sparkles size={14} className="text-indigo-600" />
+          <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">AI Analysis</span>
         </div>
       </div>
 
-      <div className="flex flex-col items-center space-y-6">
+      <div className="flex flex-col items-center space-y-8">
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.1, rotate: 5 }}
+          whileTap={{ scale: 0.9 }}
           onClick={toggleListening}
-          className={`w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-lg ${
+          className={`w-24 h-24 rounded-[2rem] flex items-center justify-center transition-all shadow-2xl ${
             isListening 
-              ? 'bg-red-500 text-white animate-pulse' 
-              : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              ? 'bg-red-500 text-white shadow-red-200 animate-pulse' 
+              : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
           }`}
         >
-          {isListening ? <MicOff size={32} /> : <Mic size={32} />}
+          {isListening ? <MicOff size={40} /> : <Mic size={40} />}
         </motion.button>
 
         <div className="w-full">

@@ -1,5 +1,5 @@
 {
-  "name": "NaijaLearn: Interactive Education",
-  "description": "An educational platform for Nigerian students (Primary to SSS) featuring interactive cartoons, cultural lessons, and AI-powered engagement monitoring.",
+  "name": "B-tool (brain tool)",
+  "description": "An AI-powered brain-boosting educational platform for Nigerian students (Primary to SSS) featuring interactive lessons, character buddies, and cognitive practice modes.",
   "requestFramePermissions": ["camera", "microphone"]
 }

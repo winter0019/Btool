@@ -95,17 +95,23 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
       })
     ]));
 
-    for (const part of sceneResponse.candidates[0].content.parts) {
-      if (part.inlineData) {
-        lessonData.cartoonImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-        break;
+    const sceneParts = sceneResponse.candidates?.[0]?.content?.parts;
+    if (sceneParts) {
+      for (const part of sceneParts) {
+        if (part.inlineData) {
+          lessonData.cartoonImageUrl = `data:image/png;base64,${part.inlineData.data}`;
+          break;
+        }
       }
     }
 
-    for (const part of characterResponse.candidates[0].content.parts) {
-      if (part.inlineData) {
-        lessonData.characterImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-        break;
+    const characterParts = characterResponse.candidates?.[0]?.content?.parts;
+    if (characterParts) {
+      for (const part of characterParts) {
+        if (part.inlineData) {
+          lessonData.characterImageUrl = `data:image/png;base64,${part.inlineData.data}`;
+          break;
+        }
       }
     }
   } catch (err) {

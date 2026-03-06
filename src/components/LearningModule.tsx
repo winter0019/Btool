@@ -119,55 +119,52 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
-        <div className="flex items-center">
-          <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors mr-2 md:mr-4">
-            <ArrowLeft size={24} />
-          </button>
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-800">{lesson.title}</h2>
-            <div className="flex flex-wrap items-center gap-2 md:gap-4 mt-1">
-              <div className="flex items-center space-x-2">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${subject.color}`}>
-                  {subject.name}
-                </span>
-                <span className="text-xs text-slate-400">•</span>
-                <span className="text-xs text-slate-400">{level} Level</span>
+          <div className="flex items-center">
+            <button onClick={onBack} className="p-3 bg-white hover:bg-slate-50 border border-slate-100 rounded-2xl transition-all mr-4 md:mr-6 shadow-sm hover:shadow-md group">
+              <ArrowLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
+            </button>
+            <div>
+              <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight">{lesson.title}</h2>
+              <div className="flex flex-wrap items-center gap-2 md:gap-4 mt-2">
+                <div className="flex items-center space-x-2">
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${subject.color}`}>
+                    {subject.name}
+                  </span>
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">{level}</span>
+                </div>
+                <button 
+                  onClick={() => handleSpeak(lesson.content)}
+                  className={`flex items-center space-x-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${
+                    isSpeaking ? 'bg-red-500 text-white shadow-red-200' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+                  }`}
+                >
+                  {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                  <span>{isSpeaking ? 'Stop Audio' : 'Play Narration'}</span>
+                </button>
               </div>
-              <button 
-                onClick={() => handleSpeak(lesson.content)}
-                className={`flex items-center space-x-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
-                  isSpeaking ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
-                }`}
-              >
-                {isSpeaking ? <VolumeX size={12} /> : <Volume2 size={12} />}
-                <span>{isSpeaking ? 'Stop' : 'Listen'}</span>
-              </button>
             </div>
           </div>
-        </div>
         
         {engagementFeedback && (
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="hidden md:flex items-center bg-white border border-slate-100 p-4 rounded-2xl shadow-sm max-w-sm"
+            className="hidden md:flex items-center bg-white border border-slate-100 p-5 rounded-[2rem] shadow-xl shadow-indigo-100/20 max-w-sm relative overflow-hidden"
           >
-            <div className="mr-4 p-3 bg-indigo-50 rounded-xl text-indigo-600">
+            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-600" />
+            <div className="mr-4 p-3 bg-indigo-50 rounded-2xl text-indigo-600">
               <Brain size={24} />
             </div>
             <div className="flex-1">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">AI Tutor Feedback</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Brain Monitor</p>
                 <div className="flex space-x-2">
-                  <span className="text-[9px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded-md font-bold uppercase">
+                  <span className="text-[9px] px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-black uppercase tracking-tighter">
                     {engagementFeedback.emotion}
-                  </span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-md font-bold uppercase">
-                    Conf: {engagementFeedback.confidence}
                   </span>
                 </div>
               </div>
-              <p className="text-xs text-slate-600 leading-tight">{engagementFeedback.feedback}</p>
+              <p className="text-xs font-medium text-slate-600 leading-relaxed">{engagementFeedback.feedback}</p>
             </div>
           </motion.div>
         )}
@@ -246,16 +243,19 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
           </div>
 
           {/* Interactive Demo Section */}
-          <div className="bg-indigo-600 rounded-[2rem] p-6 md:p-8 text-white shadow-xl">
-            <div className="flex items-center mb-4">
-              <Sparkles className="mr-3" />
-              <h3 className="text-lg md:text-xl font-bold">Interactive Demo</h3>
+          <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2.5rem] p-8 md:p-10 text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
+            <div className="flex items-center mb-6">
+              <div className="p-3 bg-white/20 rounded-2xl mr-4">
+                <Sparkles className="text-white" />
+              </div>
+              <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight">Brain Booster Activity</h3>
             </div>
-            <p className="text-sm md:text-base text-indigo-100 mb-6 leading-relaxed">
+            <p className="text-base md:text-lg text-indigo-50 mb-8 leading-relaxed font-medium">
               {lesson.interactiveDemo}
             </p>
-            <button className="w-full sm:w-auto bg-white text-indigo-600 px-6 py-3 rounded-2xl font-bold hover:bg-indigo-50 transition-colors shadow-lg">
-              Start Activity
+            <button className="w-full sm:w-auto bg-white text-indigo-600 px-10 py-4 rounded-[1.5rem] font-black uppercase tracking-widest hover:bg-indigo-50 transition-all shadow-xl hover:scale-105 active:scale-95">
+              Start Booster
             </button>
           </div>
 
@@ -320,9 +320,9 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
                 <div key={i} className="space-y-3">
                   <p className="font-medium text-slate-700 text-sm">{i + 1}. {q.question}</p>
                   <div className="grid grid-cols-1 gap-2">
-                    {q.options?.map((opt: string) => (
+                    {q.options?.map((opt: string, optIdx: number) => (
                       <button
-                        key={opt}
+                        key={`${i}-${optIdx}`}
                         disabled={submitted}
                         onClick={() => setQuizResults(prev => ({ ...prev, [i]: opt }))}
                         className={`p-3 md:p-4 rounded-xl text-left text-sm transition-all border-2 ${
@@ -352,13 +352,13 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
           </div>
 
           {/* Cultural Context Note */}
-          <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100">
-            <div className="flex items-center mb-3 text-emerald-700">
-              <AlertCircle size={18} className="mr-2" />
-              <h4 className="font-bold text-sm uppercase tracking-wider">Naija Context</h4>
+          <div className="bg-emerald-50 p-8 rounded-[2.5rem] border border-emerald-100 shadow-sm">
+            <div className="flex items-center mb-4 text-emerald-700">
+              <AlertCircle size={20} className="mr-3" />
+              <h4 className="font-black text-xs uppercase tracking-widest">Local Insight</h4>
             </div>
-            <p className="text-xs text-emerald-800 leading-relaxed opacity-80">
-              This lesson is tailored to the Nigerian National Curriculum and includes local examples to help you understand better!
+            <p className="text-sm text-emerald-800 leading-relaxed font-medium opacity-90">
+              This mission is built for Nigeria! We've included local examples and context to help you master this topic faster.
             </p>
           </div>
         </div>

@@ -28,38 +28,41 @@ export const LevelSelector: React.FC<LevelSelectorProps> = ({ onSelect }) => {
       <motion.h2 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-3xl md:text-4xl font-bold text-slate-800 mb-2 text-center"
+        className="text-4xl md:text-5xl font-black text-slate-900 mb-4 text-center tracking-tight"
       >
-        Welcome to NaijaLearn!
+        Activate Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Brain Power</span>
       </motion.h2>
       <motion.p 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="text-slate-500 mb-12 text-center max-w-md"
+        className="text-slate-500 mb-16 text-center max-w-lg text-lg font-medium"
       >
-        Select your school level to start your interactive learning journey.
+        Choose your mission level to begin your AI-powered learning adventure.
       </motion.p>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-7xl">
         {LEVELS.map((level, index) => (
           <motion.button
             key={level}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 * index }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 * index, type: 'spring', stiffness: 100 }}
+            whileHover={{ y: -10, scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => onSelect(level)}
-            className={`flex flex-col items-center justify-center p-8 rounded-3xl border-2 transition-all duration-300 shadow-lg ${LEVEL_COLORS[level]}`}
+            className={`group relative flex flex-col items-center justify-center p-10 rounded-[2.5rem] border-2 transition-all duration-500 shadow-2xl shadow-indigo-100/20 overflow-hidden ${LEVEL_COLORS[level]}`}
           >
-            <div className="mb-4 p-4 bg-white/50 rounded-2xl">
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="mb-6 p-6 bg-white/40 backdrop-blur-sm rounded-3xl group-hover:rotate-6 transition-transform duration-500">
               {LEVEL_ICONS[level]}
             </div>
-            <span className="text-xl font-bold uppercase tracking-wide text-center">{level}</span>
-            <span className="text-xs mt-2 opacity-70 text-center">
-              {level === 'Primary 1-3' ? 'Lower Primary' : level === 'Primary 4-5' ? 'Upper Primary' : level === 'JSS' ? 'Junior Secondary' : 'Senior Secondary'}
-            </span>
+            <span className="text-2xl font-black uppercase tracking-tight text-center">{level}</span>
+            <div className="mt-3 px-4 py-1 bg-black/5 rounded-full">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-60 text-center">
+                {level === 'Primary 1-3' ? 'Lower Primary' : level === 'Primary 4-5' ? 'Upper Primary' : level === 'JSS' ? 'Junior Secondary' : 'Senior Secondary'}
+              </span>
+            </div>
           </motion.button>
         ))}
       </div>

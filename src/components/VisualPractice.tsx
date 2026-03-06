@@ -86,28 +86,33 @@ export const VisualPractice: React.FC<VisualPracticeProps> = ({ context, charact
   }, [isActive, stream]);
 
   return (
-    <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
-            <Video size={20} />
+    <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center space-x-4">
+          <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-100">
+            <Video size={24} />
           </div>
-          <h3 className="font-bold text-slate-800">Visual Practice</h3>
+          <div>
+            <h3 className="font-black text-slate-900 uppercase tracking-tight">Visual Mission</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Act like {characterName.split(',')[0]}</p>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Act like {characterName}</span>
-          <Sparkles size={14} className="text-indigo-400" />
+        <div className="flex items-center space-x-2 bg-indigo-50 px-3 py-1 rounded-full">
+          <Sparkles size={14} className="text-indigo-600" />
+          <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">AI Vision</span>
         </div>
       </div>
 
-      <div className="flex flex-col items-center space-y-6">
-        <div className="w-full max-w-md aspect-video rounded-3xl overflow-hidden bg-slate-900 relative border-4 border-white shadow-xl">
+      <div className="flex flex-col items-center space-y-8">
+        <div className="w-full max-w-md aspect-video rounded-[2.5rem] overflow-hidden bg-slate-900 relative border-8 border-white shadow-2xl">
           {!isActive ? (
-            <div className="flex flex-col items-center justify-center h-full text-white/50 space-y-4">
-              <VideoOff size={48} />
+            <div className="flex flex-col items-center justify-center h-full text-white/50 space-y-6">
+              <div className="p-6 bg-white/10 rounded-full">
+                <VideoOff size={48} />
+              </div>
               <button 
                 onClick={startCamera}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg"
+                className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl hover:scale-105 active:scale-95"
               >
                 Start Acting Session
               </button>
@@ -128,7 +133,7 @@ export const VisualPractice: React.FC<VisualPracticeProps> = ({ context, charact
                   <motion.div 
                     initial={{ scale: 0, x: -20 }}
                     animate={{ scale: 1, x: 0 }}
-                    className="absolute top-4 left-4 w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-white/20 backdrop-blur-sm z-10"
+                    className="absolute top-6 left-6 w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-white/20 backdrop-blur-sm z-10"
                   >
                     <img src={characterImageUrl} alt="Mask" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <div className="absolute inset-0 border-2 border-indigo-500 rounded-full animate-pulse" />
@@ -138,38 +143,25 @@ export const VisualPractice: React.FC<VisualPracticeProps> = ({ context, charact
                     initial={{ scale: 0, rotate: -20 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ delay: 0.5 }}
-                    className="absolute bottom-20 left-4 bg-white/90 px-3 py-1 rounded-full shadow-lg border border-indigo-100 flex items-center space-x-2 z-10"
+                    className="absolute bottom-24 left-6 bg-white/90 px-4 py-2 rounded-2xl shadow-xl border border-indigo-100 flex items-center space-x-2 z-10"
                   >
-                    <Star size={14} className="text-amber-500 fill-amber-500" />
-                    <span className="text-[10px] font-bold text-indigo-600 uppercase">Act like {characterName.split(',')[0]}!</span>
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ scale: 0, y: 20 }}
-                    animate={{ scale: 1, y: 0 }}
-                    transition={{ delay: 1 }}
-                    className="absolute top-4 right-4 bg-white/90 p-2 rounded-2xl shadow-lg border border-indigo-100 z-10"
-                  >
-                    <div className="flex space-x-1">
-                      {[1, 2, 3].map(i => (
-                        <Star key={i} size={12} className="text-amber-400 fill-amber-400" />
-                      ))}
-                    </div>
+                    <Star size={16} className="text-amber-500 fill-amber-500" />
+                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Act like {characterName.split(',')[0]}!</span>
                   </motion.div>
                 </>
               )}
 
-              <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest animate-pulse">
-                Recording Session
+              <div className="absolute top-6 right-6 bg-red-500 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse shadow-lg">
+                Recording Mission
               </div>
 
-              <div className="absolute bottom-6 left-0 right-0 flex justify-center">
+              <div className="absolute bottom-8 left-0 right-0 flex justify-center">
                 <button 
                   onClick={stopCameraAndAnalyze}
-                  className="px-8 py-3 bg-white text-red-600 hover:bg-red-50 rounded-2xl font-bold transition-all shadow-xl flex items-center space-x-2"
+                  className="px-10 py-4 bg-white text-red-600 hover:bg-red-50 rounded-2xl font-black uppercase tracking-widest transition-all shadow-2xl flex items-center space-x-3 hover:scale-105 active:scale-95"
                 >
-                  <VideoOff size={18} />
-                  <span>Stop & Analyze</span>
+                  <VideoOff size={20} />
+                  <span>End Mission</span>
                 </button>
               </div>
             </>
