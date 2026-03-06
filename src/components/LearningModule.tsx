@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Subject, EducationLevel } from '../types';
+import { Subject, EducationLevel, CharacterBuddy } from '../types';
 import { generateLesson, generateSpeech } from '../services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Sparkles, Brain, Play, CheckCircle2, AlertCircle, Volume2, VolumeX } from 'lucide-react';
@@ -11,11 +11,12 @@ import { VisualPractice } from './VisualPractice';
 interface LearningModuleProps {
   level: EducationLevel;
   subject: Subject;
+  character: CharacterBuddy;
   onBack: () => void;
   engagementFeedback?: { engagementScore: number; emotion: string; confidence: string; feedback: string };
 }
 
-export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, onBack, engagementFeedback }) => {
+export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, character, onBack, engagementFeedback }) => {
   const [loading, setLoading] = useState(true);
   const [lesson, setLesson] = useState<any>(null);
   const [topic, setTopic] = useState('');
@@ -29,7 +30,7 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
   const fetchLesson = async (customTopic?: string) => {
     setLoading(true);
     try {
-      const result = await generateLesson(level, subject, customTopic || subject.name);
+      const result = await generateLesson(level, subject, customTopic || subject.name, character);
       setLesson(result);
       setTopic(result.title);
       
@@ -180,15 +181,15 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
           >
             <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-md shrink-0">
               <img 
-                src={lesson.characterImageUrl || `https://picsum.photos/seed/${lesson.characterPersona.replace(/\s/g, '')}/200/200`}
-                alt={lesson.characterPersona}
+                src={lesson.characterImageUrl || `https://picsum.photos/seed/${character.name.replace(/\s/g, '')}/200/200`}
+                alt={character.name}
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div className="flex-1 text-center sm:text-left w-full">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg md:text-xl font-bold text-slate-800">{lesson.characterPersona}</h3>
+                <h3 className="text-lg md:text-xl font-bold text-slate-800">{character.name}</h3>
                 <button 
                   onClick={() => handleSpeak(lesson.characterGreeting)}
                   className="p-2 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
@@ -287,7 +288,7 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                 >
-                  <VoicePractice context={lesson.content} characterName={lesson.characterPersona} />
+                  <VoicePractice context={lesson.content} characterName={character.name} />
                 </motion.div>
               ) : (
                 <motion.div
@@ -298,7 +299,7 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
                 >
                   <VisualPractice 
                     context={lesson.content} 
-                    characterName={lesson.characterPersona} 
+                    characterName={character.name} 
                     characterImageUrl={lesson.characterImageUrl}
                     level={level}
                   />

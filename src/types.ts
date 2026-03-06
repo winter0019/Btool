@@ -16,8 +16,16 @@ export interface Lesson {
   interactiveDemo?: string;
 }
 
+export interface CharacterBuddy {
+  id: string;
+  name: string;
+  description: string;
+  avatar: string;
+}
+
 export interface UserState {
   level: EducationLevel | null;
   currentSubject: Subject | null;
   currentLesson: Lesson | null;
+  selectedCharacter: CharacterBuddy | null;
 }

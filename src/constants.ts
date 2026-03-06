@@ -1,4 +1,4 @@
-import { Subject, EducationLevel } from './types';
+import { Subject, EducationLevel, CharacterBuddy } from './types';
 
 export const LEVELS: EducationLevel[] = ['Primary 1-3', 'Primary 4-5', 'JSS', 'SSS'];
 
@@ -28,5 +28,28 @@ export const SUBJECTS: Record<EducationLevel, Subject[]> = {
     { id: 'quant', name: 'Further Maths', icon: '📈', description: 'Calculus, statistics and mechanics', color: 'bg-orange-100 text-orange-700' },
     { id: 'art', name: 'Visual Arts', icon: '🖼️', description: 'Professional artistic techniques', color: 'bg-pink-100 text-pink-700' },
     { id: 'culture', name: 'Government & History', icon: '🏛️', description: 'Nigerian political development', color: 'bg-emerald-100 text-emerald-700' },
+  ],
+};
+
+export const CHARACTERS: Record<EducationLevel, CharacterBuddy[]> = {
+  'Primary 1-3': [
+    { id: 'spiderman', name: 'Spiderman', description: 'Your friendly neighborhood Science buddy!', avatar: '🕷️' },
+    { id: 'elsa', name: 'Elsa', description: 'Let\'s learn with some magic!', avatar: '❄️' },
+    { id: 'simba', name: 'Simba', description: 'Roar into learning!', avatar: '🦁' },
+  ],
+  'Primary 4-5': [
+    { id: 'ninja-turtle', name: 'Ninja Turtle', description: 'Cowabunga! Ready for some math?', avatar: '🐢' },
+    { id: 'shark', name: 'Friendly Shark', description: 'Dive deep into knowledge!', avatar: '🦈' },
+    { id: 'robot', name: 'Robo-Tutor', description: 'Beep boop! Let\'s boost your brain.', avatar: '🤖' },
+  ],
+  'JSS': [
+    { id: 'mr-bean', name: 'Mr. Bean', description: 'Learning is funny and easy!', avatar: '👔' },
+    { id: 'detective', name: 'Detective Brain', description: 'Let\'s solve the mystery of science.', avatar: '🔍' },
+    { id: 'pilot', name: 'Captain Knowledge', description: 'Flying high with education!', avatar: '👨‍✈️' },
+  ],
+  'SSS': [
+    { id: 'einstein', name: 'Albert Einstein', description: 'Imagination is more important than knowledge.', avatar: '👴' },
+    { id: 'soyinka', name: 'Wole Soyinka', description: 'Mastering the art of words.', avatar: '✍️' },
+    { id: 'curie', name: 'Marie Curie', description: 'Be less curious about people and more curious about ideas.', avatar: '🧪' },
   ],
 };

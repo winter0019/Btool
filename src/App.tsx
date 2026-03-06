@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { EducationLevel, Subject } from './types';
+import { EducationLevel, Subject, CharacterBuddy } from './types';
 import { LevelSelector } from './components/LevelSelector';
 import { SubjectGrid } from './components/SubjectGrid';
+import { CharacterSelector } from './components/CharacterSelector';
 import { LearningModule } from './components/LearningModule';
 import { CameraFeed } from './components/CameraFeed';
 import { motion, AnimatePresence } from 'motion/react';
@@ -10,6 +11,7 @@ import { Sparkles, Brain, Zap, ShieldCheck } from 'lucide-react';
 export default function App() {
   const [level, setLevel] = useState<EducationLevel | null>(null);
   const [subject, setSubject] = useState<Subject | null>(null);
+  const [character, setCharacter] = useState<CharacterBuddy | null>(null);
   const [engagementFeedback, setEngagementFeedback] = useState<{ engagementScore: number; emotion: string; confidence: string; feedback: string } | undefined>();
 
   const handleLevelSelect = (selectedLevel: EducationLevel) => {
@@ -20,13 +22,23 @@ export default function App() {
     setSubject(selectedSubject);
   };
 
+  const handleCharacterSelect = (selectedCharacter: CharacterBuddy) => {
+    setCharacter(selectedCharacter);
+  };
+
   const handleBackToLevels = () => {
     setLevel(null);
     setSubject(null);
+    setCharacter(null);
   };
 
   const handleBackToSubjects = () => {
     setSubject(null);
+    setCharacter(null);
+  };
+
+  const handleBackToCharacters = () => {
+    setCharacter(null);
   };
 
   const handleEngagementAnalysis = (analysis: { engagementScore: number; emotion: string; confidence: string; feedback: string }) => {
@@ -98,6 +110,19 @@ export default function App() {
                 onBack={handleBackToLevels} 
               />
             </motion.div>
+          ) : !character ? (
+            <motion.div
+              key="character-selector"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+            >
+              <CharacterSelector 
+                level={level} 
+                onSelect={handleCharacterSelect} 
+                onBack={handleBackToSubjects} 
+              />
+            </motion.div>
           ) : (
             <motion.div
               key="learning-module"
@@ -108,7 +133,8 @@ export default function App() {
               <LearningModule 
                 level={level} 
                 subject={subject} 
-                onBack={handleBackToSubjects}
+                character={character}
+                onBack={handleBackToCharacters}
                 engagementFeedback={engagementFeedback}
               />
             </motion.div>

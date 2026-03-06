@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { EducationLevel, Subject } from "../types";
+import { EducationLevel, Subject, CharacterBuddy } from "../types";
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
   try {
@@ -11,7 +11,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Pr
   }
 }
 
-export async function generateLesson(level: EducationLevel, subject: Subject, topic: string) {
+export async function generateLesson(level: EducationLevel, subject: Subject, topic: string, character: CharacterBuddy) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   
   const fetchLesson = () => ai.models.generateContent({
@@ -19,14 +19,13 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
     contents: `You are an expert teacher for Nigerian students at the ${level} level. 
     Create a fun, interactive lesson on the topic: "${topic}" for the subject: "${subject.name}".
     
+    Your teaching assistant is ${character.name} (${character.description}).
+    
     Guidelines:
-    - For Primary 1-3: Use very simple words, phonics-based learning, storytelling, and colorful cartoon-like descriptions. Focus on foundational concepts. Character: A fun cartoon like Tom & Jerry, Spiderman, or a friendly animal.
-    - For Primary 4-5: Use simple words, storytelling, and cartoon-like descriptions. Focus on practical applications. Character: An adventurous character like a Ninja Turtle or a friendly Shark.
-    - For JSS: Use clear explanations with real-world examples from Nigeria. Character: A funny or relatable character like Mr. Bean or a local hero.
-    - For SSS: Use detailed concepts, critical thinking questions, and academic rigor. Character: A famous person in the field (e.g., Einstein for Science, Wole Soyinka for Literature, Ben Enwonwu for Art).
-    - Include a "Character Persona" (name and role) and a "Character Greeting" that they say to the student.
-    - The character should be the one "teaching" the lesson in the content, using their unique personality and catchphrases.
-    - Include a "Cartoon Scene" description featuring the character.
+    - Use clear, engaging language suitable for ${level}.
+    - The character ${character.name} should be the one "teaching" the lesson in the content, using their unique personality and catchphrases.
+    - Include a "Character Greeting" from ${character.name} to the student.
+    - Include a "Cartoon Scene" description featuring ${character.name} in a Nigerian setting related to the topic.
     - Include an "Interactive Demo" idea.
     - Keep it engaging and culturally relevant to Nigeria.`,
     config: {
@@ -36,7 +35,6 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
         properties: {
           title: { type: Type.STRING },
           content: { type: Type.STRING, description: "The main lesson text in Markdown" },
-          characterPersona: { type: Type.STRING, description: "The name and role of the character buddy (e.g., 'Spiderman, your Science Buddy')" },
           characterGreeting: { type: Type.STRING, description: "A friendly greeting from the character" },
           cartoonDescription: { type: Type.STRING, description: "Description of a cartoon scene to accompany the lesson" },
           interactiveDemo: { type: Type.STRING, description: "A simple interactive task for the student" },
@@ -53,7 +51,7 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
             }
           }
         },
-        required: ["title", "content", "characterPersona", "characterGreeting", "cartoonDescription", "interactiveDemo", "quiz"]
+        required: ["title", "content", "characterGreeting", "cartoonDescription", "interactiveDemo", "quiz"]
       }
     }
   });
@@ -80,18 +78,18 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
   try {
     const [sceneResponse, characterResponse] = await withRetry(() => Promise.all([
       ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3.1-flash-image-preview',
         contents: {
-          parts: [{ text: `A colorful, friendly illustration for a student. The scene features ${lessonData.characterPersona} teaching about ${lessonData.title}. Description: ${lessonData.cartoonDescription}. Style: Vibrant, educational, friendly, culturally relevant to Nigeria.` }],
+          parts: [{ text: `A high-quality, vibrant, educational cartoon illustration for a student. The scene features ${character.name} teaching about ${lessonData.title} in a friendly Nigerian classroom or setting. Description: ${lessonData.cartoonDescription}. Style: Modern 3D cartoon, bright colors, friendly, educational.` }],
         },
         config: { imageConfig: { aspectRatio: "16:9", imageSize: "1K" } }
       }),
       ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3.1-flash-image-preview',
         contents: {
-          parts: [{ text: `A portrait of ${lessonData.characterPersona}. If it's a famous person, make it a respectful and accurate portrait. If it's a cartoon, make it vibrant and friendly. Style: Clean background, portrait, educational.` }],
+          parts: [{ text: `A clean, high-quality portrait of ${character.name}. Style: 3D cartoon headshot, white background, friendly expression, perfect for a mask sticker. No background elements.` }],
         },
-        config: { imageConfig: { aspectRatio: "1:1", imageSize: "512px" } }
+        config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
       })
     ]));
 
@@ -117,7 +115,7 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
   } catch (err) {
     console.error("Failed to generate images:", err);
     lessonData.cartoonImageUrl = `https://picsum.photos/seed/${lessonData.title.replace(/\s/g, '')}/1200/675`;
-    lessonData.characterImageUrl = `https://picsum.photos/seed/${lessonData.characterPersona.replace(/\s/g, '')}/200/200`;
+    lessonData.characterImageUrl = `https://picsum.photos/seed/${character.name.replace(/\s/g, '')}/200/200`;
   }
 
   return lessonData;
