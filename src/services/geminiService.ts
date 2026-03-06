@@ -78,18 +78,18 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
   try {
     const [sceneResponse, characterResponse] = await withRetry(() => Promise.all([
       ai.models.generateContent({
-        model: 'gemini-3.1-flash-image-preview',
+        model: 'gemini-2.5-flash-image',
         contents: {
           parts: [{ text: `A high-quality, vibrant, educational cartoon illustration for a student. The scene features ${character.name} teaching about ${lessonData.title} in a friendly Nigerian classroom or setting. Description: ${lessonData.cartoonDescription}. Style: Modern 3D cartoon, bright colors, friendly, educational.` }],
         },
-        config: { imageConfig: { aspectRatio: "16:9", imageSize: "1K" } }
+        config: { imageConfig: { aspectRatio: "16:9" } }
       }),
       ai.models.generateContent({
-        model: 'gemini-3.1-flash-image-preview',
+        model: 'gemini-2.5-flash-image',
         contents: {
           parts: [{ text: `A clean, high-quality portrait of ${character.name}. Style: 3D cartoon headshot, white background, friendly expression, perfect for a mask sticker. No background elements.` }],
         },
-        config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
+        config: { imageConfig: { aspectRatio: "1:1" } }
       })
     ]));
 
