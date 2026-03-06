@@ -17,6 +17,9 @@ export const VoicePractice: React.FC<VoicePracticeProps> = ({ context, character
     hint: string;
     pronunciationFeedback: string;
     clarityScore: number;
+    strengths: string;
+    improvements: string;
+    futureHints: string;
   } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
@@ -32,7 +35,6 @@ export const VoicePractice: React.FC<VoicePracticeProps> = ({ context, character
       rec.onresult = (event: any) => {
         const text = event.results[0][0].transcript;
         setTranscript(text);
-        handleAnalyze(text);
       };
 
       rec.onend = () => {
@@ -51,6 +53,9 @@ export const VoicePractice: React.FC<VoicePracticeProps> = ({ context, character
   const toggleListening = () => {
     if (isListening) {
       recognition?.stop();
+      if (transcript) {
+        handleAnalyze(transcript);
+      }
     } else {
       setTranscript('');
       setFeedback(null);
@@ -155,20 +160,39 @@ export const VoicePractice: React.FC<VoicePracticeProps> = ({ context, character
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-black/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Speech Clarity</span>
-                    <span className="text-xs font-bold">{feedback.clarityScore}%</span>
+                <div className="pt-3 border-t border-black/5 space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Speech Clarity</span>
+                      <span className="text-xs font-bold">{feedback.clarityScore}%</span>
+                    </div>
+                    <div className="w-full bg-black/5 h-1.5 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${feedback.clarityScore}%` }}
+                        className={`h-full ${feedback.clarityScore > 70 ? 'bg-green-500' : feedback.clarityScore > 40 ? 'bg-amber-500' : 'bg-red-500'}`}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full bg-black/5 h-1.5 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${feedback.clarityScore}%` }}
-                      className={`h-full ${feedback.clarityScore > 70 ? 'bg-green-500' : feedback.clarityScore > 40 ? 'bg-amber-500' : 'bg-red-500'}`}
-                    />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-green-100/50 p-3 rounded-xl">
+                      <p className="text-[10px] font-bold text-green-700 uppercase mb-1">What went well</p>
+                      <p className="text-xs text-green-800">{feedback.strengths}</p>
+                    </div>
+                    <div className="bg-amber-100/50 p-3 rounded-xl">
+                      <p className="text-[10px] font-bold text-amber-700 uppercase mb-1">To improve</p>
+                      <p className="text-xs text-amber-800">{feedback.improvements}</p>
+                    </div>
                   </div>
+
+                  <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                    <p className="text-[10px] font-bold text-indigo-700 uppercase mb-1">Future Hint</p>
+                    <p className="text-xs text-indigo-800">{feedback.futureHints}</p>
+                  </div>
+
                   <p className="text-xs italic opacity-80">
-                    <span className="font-bold not-italic">Pronunciation:</span> {feedback.pronunciationFeedback}
+                    <span className="font-bold not-italic">Pronunciation Tip:</span> {feedback.pronunciationFeedback}
                   </p>
                 </div>
               </motion.div>

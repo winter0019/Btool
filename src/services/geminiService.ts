@@ -186,6 +186,10 @@ export async function analyzeVoiceInput(userInput: string, context: string, char
       The character teaching is: "${characterName}".
       Evaluate if the student is correct, provide a gentle correction if needed, and give a helpful hint to improve their understanding. 
       Also, provide specific feedback on their pronunciation and clarity of speech.
+      Identify:
+      1. Strengths: What did they do well?
+      2. Improvements: What specifically should they work on?
+      3. Future Hints: How can they improve for next time?
       The feedback should be in the voice and personality of ${characterName}.
       Keep the tone encouraging and suitable for a Nigerian student.`,
       config: {
@@ -197,20 +201,32 @@ export async function analyzeVoiceInput(userInput: string, context: string, char
             feedback: { type: Type.STRING },
             hint: { type: Type.STRING },
             pronunciationFeedback: { type: Type.STRING, description: "Specific feedback on how to pronounce words better" },
-            clarityScore: { type: Type.INTEGER, description: "Score from 0 to 100 on how clear the speech was" }
+            clarityScore: { type: Type.INTEGER, description: "Score from 0 to 100 on how clear the speech was" },
+            strengths: { type: Type.STRING, description: "What the student did well" },
+            improvements: { type: Type.STRING, description: "What the student should improve" },
+            futureHints: { type: Type.STRING, description: "Hints for future practice" }
           },
-          required: ["isCorrect", "feedback", "hint", "pronunciationFeedback", "clarityScore"]
+          required: ["isCorrect", "feedback", "hint", "pronunciationFeedback", "clarityScore", "strengths", "improvements", "futureHints"]
         }
       }
     }));
     return JSON.parse(response.text || "{}");
   } catch (err) {
     console.error("Voice analysis failed:", err);
-    return { isCorrect: false, feedback: "I couldn't quite hear that. Could you try again?", hint: "Try speaking clearly!" };
+    return { 
+      isCorrect: false, 
+      feedback: "I couldn't quite hear that. Could you try again?", 
+      hint: "Try speaking clearly!",
+      pronunciationFeedback: "Try to articulate each word clearly.",
+      clarityScore: 0,
+      strengths: "You're trying your best!",
+      improvements: "Speak a bit louder next time.",
+      futureHints: "Practice saying the words slowly."
+    };
   }
 }
 
-export async function analyzeEngagement(imageData: string) {
+export async function analyzeVisualPractice(imageData: string, characterName: string, context: string) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   try {
     const response = await withRetry(() => ai.models.generateContent({
@@ -218,7 +234,17 @@ export async function analyzeEngagement(imageData: string) {
       contents: {
         parts: [
           { inlineData: { data: imageData.split(',')[1], mimeType: "image/jpeg" } },
-          { text: "Analyze the student's facial expression, eye contact, and posture in this image. Specifically assess: 1. Engagement level (0-100). 2. Primary emotion. 3. Confidence level (Low, Medium, High). 4. A brief, encouraging feedback message tailored to their state." }
+          { text: `Analyze the student's performance in this visual practice session. 
+          The student is acting or talking like the character: "${characterName}".
+          The context of the lesson is: "${context}".
+          Evaluate:
+          1. Acting/Engagement: How well are they embodying the character?
+          2. Facial Expression & Posture: Are they focused and expressive?
+          3. Strengths: What did they do well in their performance?
+          4. Improvements: What could they do better?
+          5. Future Hints: How to improve their acting or focus for next time?
+          The feedback should be in the voice and personality of ${characterName}.
+          Keep the tone encouraging and suitable for a Nigerian student.` }
         ]
       },
       config: {
@@ -226,24 +252,28 @@ export async function analyzeEngagement(imageData: string) {
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            engagementScore: { type: Type.NUMBER, description: "Score from 0 to 100" },
-            emotion: { type: Type.STRING, description: "The detected primary emotion (e.g., Happy, Focused, Confused, Bored)" },
-            confidence: { type: Type.STRING, description: "Confidence level: Low, Medium, or High" },
-            feedback: { type: Type.STRING, description: "A supportive message for the student" }
+            actingScore: { type: Type.NUMBER, description: "Score from 0 to 100 on how well they embodied the character" },
+            emotion: { type: Type.STRING, description: "The detected primary emotion" },
+            feedback: { type: Type.STRING, description: "A supportive message from the character" },
+            strengths: { type: Type.STRING, description: "What the student did well visually" },
+            improvements: { type: Type.STRING, description: "What the student should improve visually" },
+            futureHints: { type: Type.STRING, description: "Hints for future visual practice" }
           },
-          required: ["engagementScore", "emotion", "confidence", "feedback"]
+          required: ["actingScore", "emotion", "feedback", "strengths", "improvements", "futureHints"]
         }
       }
     }));
 
     return JSON.parse(response.text || "{}");
   } catch (err) {
-    console.error("Failed to analyze engagement:", err);
+    console.error("Visual analysis failed:", err);
     return {
-      engagementScore: 50,
+      actingScore: 50,
       emotion: "neutral",
-      confidence: "Medium",
-      feedback: "Keep going! You're doing great."
+      feedback: "Keep practicing your character acting! You're doing great.",
+      strengths: "You have a great spirit!",
+      improvements: "Try to be more expressive with your face.",
+      futureHints: "Watch how the character moves and try to copy them!"
     };
   }
 }

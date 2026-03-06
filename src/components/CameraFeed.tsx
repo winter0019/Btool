@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, Video, VideoOff, RefreshCw } from 'lucide-react';
-import { analyzeEngagement } from '../services/geminiService';
+import { analyzeVisualPractice } from '../services/geminiService';
 
 interface CameraFeedProps {
   onAnalysis: (analysis: { engagementScore: number; emotion: string; confidence: string; feedback: string }) => void;
@@ -48,8 +48,13 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysis }) => {
       
       const imageData = canvasRef.current.toDataURL('image/jpeg');
       try {
-        const result = await analyzeEngagement(imageData);
-        onAnalysis(result);
+        const result = await analyzeVisualPractice(imageData, "Tutor", "Engagement Monitoring");
+        onAnalysis({
+          engagementScore: result.actingScore,
+          emotion: result.emotion,
+          confidence: "Medium",
+          feedback: result.feedback
+        });
       } catch (err) {
         console.error("Analysis failed:", err);
       } finally {

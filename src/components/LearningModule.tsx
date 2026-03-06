@@ -6,6 +6,7 @@ import { ArrowLeft, Sparkles, Brain, Play, CheckCircle2, AlertCircle, Volume2, V
 import ReactMarkdown from 'react-markdown';
 import confetti from 'canvas-confetti';
 import { VoicePractice } from './VoicePractice';
+import { VisualPractice } from './VisualPractice';
 
 interface LearningModuleProps {
   level: EducationLevel;
@@ -23,6 +24,7 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
   const [submitted, setSubmitted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  const [practiceMode, setPracticeMode] = useState<'audio' | 'visual'>('audio');
 
   const fetchLesson = async (customTopic?: string) => {
     setLoading(true);
@@ -257,8 +259,53 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
             </button>
           </div>
 
-          {/* Voice Practice Section */}
-          <VoicePractice context={lesson.content} characterName={lesson.characterPersona} />
+          {/* Practice Section */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
+              <h3 className="font-bold text-slate-800">Choose Practice Mode</h3>
+              <div className="flex bg-slate-100 p-1 rounded-2xl">
+                <button 
+                  onClick={() => setPracticeMode('audio')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${practiceMode === 'audio' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Audio Practice
+                </button>
+                <button 
+                  onClick={() => setPracticeMode('visual')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${practiceMode === 'visual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Visual Practice
+                </button>
+              </div>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {practiceMode === 'audio' ? (
+                <motion.div
+                  key="audio-practice"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <VoicePractice context={lesson.content} characterName={lesson.characterPersona} />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="visual-practice"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <VisualPractice 
+                    context={lesson.content} 
+                    characterName={lesson.characterPersona} 
+                    characterImageUrl={lesson.characterImageUrl}
+                    level={level}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         <div className="space-y-6">

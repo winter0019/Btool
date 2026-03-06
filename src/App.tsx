@@ -103,13 +103,6 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Floating Camera Feed */}
-        {level && (
-          <div className="fixed bottom-4 right-4 md:bottom-8 md:right-8 z-50 scale-75 md:scale-100 origin-bottom-right">
-            <CameraFeed onAnalysis={handleEngagementAnalysis} />
-          </div>
-        )}
       </main>
 
       {/* Footer */}
