@@ -92,8 +92,15 @@ export async function generateSpeech(text: string) {
   try {
     const data = await withRetry(() => apiCall('/api/speech', { text }));
     const base64Audio = data.audio;
+    const format = data.format || 'pcm';
 
     if (base64Audio) {
+      if (format === 'mp3') {
+        const pcmData = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0));
+        const blob = new Blob([pcmData], { type: 'audio/mpeg' });
+        return URL.createObjectURL(blob);
+      }
+
       // Gemini TTS returns raw PCM 16-bit 24kHz. Browsers need a WAV header to play via src.
       const pcmData = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0));
       const wavHeader = new ArrayBuffer(44);

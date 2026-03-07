@@ -1,5 +1,6 @@
 import express from "express";
 import { GoogleGenAI, Type, Modality } from "@google/genai";
+import OpenAI from "openai";
 import dotenv from "dotenv";
 import path from "path";
 
@@ -9,15 +10,14 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 // API Routes
 app.post("/api/lesson", async (req, res) => {
   try {
     const { level, subjectName, topic, character } = req.body;
     
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `You are an expert teacher for Nigerian students at the ${level} level. 
+    const prompt = `You are an expert teacher for Nigerian students at the ${level} level. 
       Create a fun, interactive lesson on the topic: "${topic}" for the subject: "${subjectName}".
       
       Your teaching assistant is ${character.name} (${character.description}).
@@ -28,36 +28,58 @@ app.post("/api/lesson", async (req, res) => {
       - Include a "Character Greeting" from ${character.name} to the student.
       - Include a "Cartoon Scene" description featuring ${character.name} in a Nigerian setting related to the topic.
       - Include an "Interactive Demo" idea.
-      - Keep it engaging and culturally relevant to Nigeria.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            content: { type: Type.STRING, description: "The main lesson text in Markdown" },
-            characterGreeting: { type: Type.STRING, description: "A friendly greeting from the character" },
-            cartoonDescription: { type: Type.STRING, description: "Description of a cartoon scene to accompany the lesson" },
-            interactiveDemo: { type: Type.STRING, description: "A simple interactive task for the student" },
-            quiz: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  question: { type: Type.STRING },
-                  options: { type: Type.ARRAY, items: { type: Type.STRING }, description: "At least 3 multiple choice options" },
-                  answer: { type: Type.STRING, description: "The correct option from the options array" }
-                },
-                required: ["question", "options", "answer"]
-              }
-            }
-          },
-          required: ["title", "content", "characterGreeting", "cartoonDescription", "interactiveDemo", "quiz"]
-        }
-      }
-    });
+      - Keep it engaging and culturally relevant to Nigeria.
+      
+      Return a JSON object with: title, content (Markdown), characterGreeting, cartoonDescription, interactiveDemo, and quiz (array of objects with question, options, answer).`;
 
-    res.json(JSON.parse(response.text || "{}"));
+    try {
+      // Try Gemini first
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              content: { type: Type.STRING },
+              characterGreeting: { type: Type.STRING },
+              cartoonDescription: { type: Type.STRING },
+              interactiveDemo: { type: Type.STRING },
+              quiz: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    question: { type: Type.STRING },
+                    options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    answer: { type: Type.STRING }
+                  },
+                  required: ["question", "options", "answer"]
+                }
+              }
+            },
+            required: ["title", "content", "characterGreeting", "cartoonDescription", "interactiveDemo", "quiz"]
+          }
+        }
+      });
+      return res.json(JSON.parse(response.text || "{}"));
+    } catch (geminiError) {
+      console.warn("Gemini lesson generation failed, trying OpenAI fallback:", geminiError);
+      if (openai) {
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: "You are a helpful educational assistant. Always respond in valid JSON." },
+            { role: "user", content: prompt }
+          ],
+          response_format: { type: "json_object" }
+        });
+        return res.json(JSON.parse(completion.choices[0].message.content || "{}"));
+      }
+      throw geminiError;
+    }
   } catch (error: any) {
     console.error("Lesson generation error:", error);
     res.status(error.status || 500).json({ error: error.message });
@@ -70,56 +92,74 @@ app.post("/api/generate-images", async (req, res) => {
 
     console.log(`Generating images for: ${characterName} - ${lessonTitle}`);
 
-    const sceneResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: `A high-quality, vibrant, educational cartoon illustration for a student. The scene features ${characterName} teaching about ${lessonTitle} in a friendly Nigerian classroom or setting. Description: ${cartoonDescription}. Style: Modern 3D cartoon, bright colors, friendly, educational.` }],
-      },
-      config: { imageConfig: { aspectRatio: "16:9" } }
-    });
-
-    const characterResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: `A clean, high-quality portrait of ${characterName}. Style: 3D cartoon headshot, white background, friendly expression, perfect for a mask sticker. No background elements.` }],
-      },
-      config: { imageConfig: { aspectRatio: "1:1" } }
-    });
+    const scenePrompt = `A high-quality, vibrant, educational cartoon illustration for a student. The scene features ${characterName} teaching about ${lessonTitle} in a friendly Nigerian classroom or setting. Description: ${cartoonDescription}. Style: Modern 3D cartoon, bright colors, friendly, educational.`;
+    const characterPrompt = `A clean, high-quality portrait of ${characterName}. Style: 3D cartoon headshot, white background, friendly expression, perfect for a mask sticker. No background elements.`;
 
     const result: any = { cartoonImageUrl: null, characterImageUrl: null };
 
-    const sceneParts = sceneResponse.candidates?.[0]?.content?.parts;
-    if (sceneParts) {
-      for (const part of sceneParts) {
-        if (part.inlineData) {
-          result.cartoonImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-          break;
+    try {
+      // Try Gemini first
+      const [sceneResponse, characterResponse] = await Promise.all([
+        ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: { parts: [{ text: scenePrompt }] },
+          config: { imageConfig: { aspectRatio: "16:9" } }
+        }),
+        ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: { parts: [{ text: characterPrompt }] },
+          config: { imageConfig: { aspectRatio: "1:1" } }
+        })
+      ]);
+
+      const sceneParts = sceneResponse.candidates?.[0]?.content?.parts;
+      if (sceneParts) {
+        for (const part of sceneParts) {
+          if (part.inlineData) {
+            result.cartoonImageUrl = `data:image/png;base64,${part.inlineData.data}`;
+            break;
+          }
         }
       }
-    }
 
-    const characterParts = characterResponse.candidates?.[0]?.content?.parts;
-    if (characterParts) {
-      for (const part of characterParts) {
-        if (part.inlineData) {
-          result.characterImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-          break;
+      const characterParts = characterResponse.candidates?.[0]?.content?.parts;
+      if (characterParts) {
+        for (const part of characterParts) {
+          if (part.inlineData) {
+            result.characterImageUrl = `data:image/png;base64,${part.inlineData.data}`;
+            break;
+          }
         }
+      }
+    } catch (geminiError: any) {
+      console.warn("Gemini image generation failed, trying OpenAI fallback:", geminiError.message);
+      if (openai) {
+        const [sceneImg, charImg] = await Promise.all([
+          openai.images.generate({
+            model: "dall-e-3",
+            prompt: scenePrompt,
+            n: 1,
+            size: "1024x1024",
+            response_format: "b64_json"
+          }),
+          openai.images.generate({
+            model: "dall-e-3",
+            prompt: characterPrompt,
+            n: 1,
+            size: "1024x1024",
+            response_format: "b64_json"
+          })
+        ]);
+        result.cartoonImageUrl = `data:image/png;base64,${sceneImg.data[0].b64_json}`;
+        result.characterImageUrl = `data:image/png;base64,${charImg.data[0].b64_json}`;
+      } else {
+        throw geminiError;
       }
     }
 
     res.json(result);
   } catch (error: any) {
-    console.error("Image generation error status:", error.status);
-    console.error("Image generation error message:", error.message);
-    
-    if (error.status === 429) {
-      return res.status(429).json({ 
-        error: "Gemini API rate limit exceeded. Please wait a moment before trying again.",
-        details: error.message 
-      });
-    }
-    
+    console.error("Image generation error:", error);
     res.status(error.status || 500).json({ error: error.message });
   }
 });
@@ -127,6 +167,23 @@ app.post("/api/generate-images", async (req, res) => {
 app.post("/api/speech", async (req, res) => {
   try {
     const { text } = req.body;
+    
+    // Try OpenAI TTS first if available (often higher quality for varied accents)
+    if (openai) {
+      try {
+        const mp3 = await openai.audio.speech.create({
+          model: "tts-1",
+          voice: "alloy",
+          input: text,
+        });
+        const buffer = Buffer.from(await mp3.arrayBuffer());
+        return res.json({ audio: buffer.toString('base64'), format: 'mp3' });
+      } catch (openaiError) {
+        console.warn("OpenAI TTS failed, falling back to Gemini:", openaiError);
+      }
+    }
+
+    // Gemini Fallback
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: `Say clearly and cheerfully for a student: ${text}` }] }],
@@ -141,7 +198,7 @@ app.post("/api/speech", async (req, res) => {
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    res.json({ audio: base64Audio });
+    res.json({ audio: base64Audio, format: 'pcm' });
   } catch (error: any) {
     console.error("Speech generation error:", error);
     res.status(error.status || 500).json({ error: error.message });
