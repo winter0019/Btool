@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import confetti from 'canvas-confetti';
 import { VoicePractice } from './VoicePractice';
 import { VisualPractice } from './VisualPractice';
+import { CartoonMaskPractice } from './CartoonMaskPractice';
 
 interface LearningModuleProps {
   level: EducationLevel;
@@ -298,10 +299,9 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                 >
-                  <VisualPractice 
+                  <CartoonMaskPractice 
                     context={lesson.content} 
                     characterName={character.name} 
-                    characterImageUrl={lesson.characterImageUrl}
                     level={level}
                   />
                 </motion.div>
