@@ -101,45 +101,33 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
 
     const lessonData = JSON.parse(response.text || "{}");
 
-    // Generate images
+    // Generate images using OpenAI via backend
     try {
       const scenePrompt = `A high-quality, vibrant, educational cartoon illustration for a student. The scene features ${character.name} teaching about ${lessonData.title} in a friendly Nigerian classroom or setting. Description: ${lessonData.cartoonDescription}. Style: Modern 3D cartoon, bright colors, friendly, educational.`;
       const characterPrompt = `A clean, high-quality portrait of ${character.name}. Style: 3D cartoon headshot, white background, friendly expression, perfect for a mask sticker. No background elements.`;
 
       const [sceneResponse, charResponse] = await Promise.all([
-        withRetry(() => ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: scenePrompt }] },
-          config: { imageConfig: { aspectRatio: "16:9" } }
-        })),
-        withRetry(() => ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: characterPrompt }] },
-          config: { imageConfig: { aspectRatio: "1:1" } }
-        }))
+        fetch('/api/generate-images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: scenePrompt, model: "gpt-image-1" })
+        }).then(r => r.json()),
+        fetch('/api/generate-images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: characterPrompt, model: "gpt-image-1" })
+        }).then(r => r.json())
       ]);
 
-      const sceneParts = sceneResponse.candidates?.[0]?.content?.parts;
-      if (sceneParts) {
-        for (const part of sceneParts) {
-          if (part.inlineData) {
-            lessonData.cartoonImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-            break;
-          }
-        }
+      if (sceneResponse.data?.[0]?.b64_json) {
+        lessonData.cartoonImageUrl = `data:image/png;base64,${sceneResponse.data[0].b64_json}`;
       }
 
-      const charParts = charResponse.candidates?.[0]?.content?.parts;
-      if (charParts) {
-        for (const part of charParts) {
-          if (part.inlineData) {
-            lessonData.characterImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-            break;
-          }
-        }
+      if (charResponse.data?.[0]?.b64_json) {
+        lessonData.characterImageUrl = `data:image/png;base64,${charResponse.data[0].b64_json}`;
       }
     } catch (err) {
-      console.error("Failed to generate images:", err);
+      console.error("Failed to generate images with OpenAI:", err);
     }
 
     // Fallback images if generation failed
