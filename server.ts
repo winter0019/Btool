@@ -1,6 +1,7 @@
 import express from "express";
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import dotenv from "dotenv";
+import path from "path";
 
 dotenv.config();
 
@@ -221,7 +222,7 @@ app.post("/api/analyze-visual", async (req, res) => {
   }
 });
 
-export async function startServer() {
+async function startServer() {
   const PORT = 3000;
 
   // Vite middleware for development
@@ -233,7 +234,13 @@ export async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
+    // Serve static files from dist in production
     app.use(express.static("dist"));
+    
+    // SPA fallback for production
+    app.get("*", (req, res) => {
+      res.sendFile(path.resolve("dist/index.html"));
+    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
@@ -241,9 +248,7 @@ export async function startServer() {
   });
 }
 
-if (process.env.NODE_ENV !== "production" || !process.env.NETLIFY) {
-  startServer();
-}
+startServer();
 
 export { app };
 
