@@ -53,12 +53,18 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
         cartoonDescription: lessonData.cartoonDescription
       }));
 
-      lessonData.cartoonImageUrl = imageData.cartoonImageUrl || `https://picsum.photos/seed/${lessonData.title.replace(/\s/g, '')}/1200/675`;
-      lessonData.characterImageUrl = imageData.characterImageUrl || `https://picsum.photos/seed/${character.name.replace(/\s/g, '')}/200/200`;
+      const cleanTopic = encodeURIComponent(lessonData.title.split(' ').slice(0, 3).join(','));
+      const cleanName = encodeURIComponent(character.name.split(' ')[0]);
+      
+      lessonData.cartoonImageUrl = imageData.cartoonImageUrl || `https://loremflickr.com/1200/675/nigeria,education,${cleanTopic}`;
+      lessonData.characterImageUrl = imageData.characterImageUrl || `https://loremflickr.com/200/200/${cleanName},cartoon`;
     } catch (err) {
       console.error("Failed to generate images:", err);
-      lessonData.cartoonImageUrl = `https://picsum.photos/seed/${lessonData.title.replace(/\s/g, '')}/1200/675`;
-      lessonData.characterImageUrl = `https://picsum.photos/seed/${character.name.replace(/\s/g, '')}/200/200`;
+      const cleanTopic = encodeURIComponent(lessonData.title.split(' ').slice(0, 3).join(','));
+      const cleanName = encodeURIComponent(character.name.split(' ')[0]);
+      
+      lessonData.cartoonImageUrl = `https://loremflickr.com/1200/675/nigeria,education,${cleanTopic}`;
+      lessonData.characterImageUrl = `https://loremflickr.com/200/200/${cleanName},cartoon`;
     }
 
     return lessonData;
