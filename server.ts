@@ -68,6 +68,8 @@ app.post("/api/generate-images", async (req, res) => {
   try {
     const { characterName, lessonTitle, cartoonDescription } = req.body;
 
+    console.log(`Generating images for: ${characterName} - ${lessonTitle}`);
+
     const sceneResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -108,7 +110,16 @@ app.post("/api/generate-images", async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error("Image generation error:", error);
+    console.error("Image generation error status:", error.status);
+    console.error("Image generation error message:", error.message);
+    
+    if (error.status === 429) {
+      return res.status(429).json({ 
+        error: "Gemini API rate limit exceeded. Please wait a moment before trying again.",
+        details: error.message 
+      });
+    }
+    
     res.status(error.status || 500).json({ error: error.message });
   }
 });

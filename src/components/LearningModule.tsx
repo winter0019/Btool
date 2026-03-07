@@ -28,6 +28,7 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
   const [practiceMode, setPracticeMode] = useState<'audio' | 'visual'>('audio');
 
   const fetchLesson = async (customTopic?: string) => {
+    if (loading && lesson) return; // Already loading a lesson
     setLoading(true);
     try {
       const result = await generateLesson(level, subject, customTopic || subject.name, character);

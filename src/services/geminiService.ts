@@ -1,19 +1,25 @@
 import { EducationLevel, Subject, CharacterBuddy } from "../types";
 
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
   try {
     const response = await fn();
     return response;
   } catch (err: any) {
-    // If it's a 429, we might want to wait longer
+    // If it's a 429 (Rate Limit), wait longer
     if (err.status === 429) {
-      const retryAfter = 30000; // 30 seconds default for quota
-      console.warn(`Quota exceeded, retrying after ${retryAfter}ms...`);
+      const retryAfter = 45000; // 45 seconds for quota reset
+      console.warn(`Quota exceeded (429), retrying in ${retryAfter / 1000}s...`);
       await new Promise(resolve => setTimeout(resolve, retryAfter));
-      return withRetry(fn, retries - 1, delay * 2);
+      // Reset retries for 429 as it's a temporary quota issue
+      return withRetry(fn, retries, delay);
     }
     
-    if (retries <= 0) throw err;
+    if (retries <= 0) {
+      console.error("Max retries reached. Error:", err);
+      throw err;
+    }
+    
+    console.warn(`Request failed, retrying in ${delay / 1000}s... (${retries} retries left)`);
     await new Promise(resolve => setTimeout(resolve, delay));
     return withRetry(fn, retries - 1, delay * 2);
   }
