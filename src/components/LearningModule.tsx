@@ -303,6 +303,8 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
                     context={lesson.content} 
                     characterName={character.name} 
                     level={level}
+                    topic={lesson.title}
+                    subjectName={subject.name}
                   />
                 </motion.div>
               )}

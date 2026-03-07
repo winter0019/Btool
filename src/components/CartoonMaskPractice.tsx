@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Video, VideoOff, RefreshCw, Star, Sparkles, Camera, CheckCircle2, X, Zap } from 'lucide-react';
+import { Video, VideoOff, RefreshCw, Star, Sparkles, Camera, CheckCircle2, X, Zap, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as faceDetection from '@tensorflow-models/face-detection';
 import '@tensorflow/tfjs-backend-webgl';
@@ -31,9 +31,11 @@ interface CartoonMaskPracticeProps {
   context: string;
   characterName: string;
   level: EducationLevel;
+  topic: string;
+  subjectName: string;
 }
 
-export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ context, characterName, level }) => {
+export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ context, characterName, level, topic, subjectName }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,7 +47,9 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [feedback, setFeedback] = useState<any>(null);
   const [isFaceDetected, setIsFaceDetected] = useState(false);
+  const [showLowLightWarning, setShowLowLightWarning] = useState(false);
   const maskImagesRef = useRef<Record<string, HTMLImageElement>>({});
+  const detectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const requestRef = useRef<number | undefined>(undefined);
 
@@ -135,6 +139,12 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
 
       if (faces.length > 0) {
         setIsFaceDetected(true);
+        setShowLowLightWarning(false);
+        if (detectionTimeoutRef.current) {
+          clearTimeout(detectionTimeoutRef.current);
+          detectionTimeoutRef.current = null;
+        }
+
         const face = faces[0];
         const { box, keypoints } = face;
         
@@ -197,6 +207,12 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
       } else {
         setIsFaceDetected(false);
         smoothedFaceRef.current.initialized = false;
+        
+        if (!detectionTimeoutRef.current && isActive) {
+          detectionTimeoutRef.current = setTimeout(() => {
+            setShowLowLightWarning(true);
+          }, 5000);
+        }
       }
     } catch (err) {
       console.error("Face detection error:", err);
@@ -284,7 +300,19 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
         </div>
       </div>
 
-      <div className="relative w-full h-[600px] md:h-[700px] rounded-[3rem] overflow-hidden bg-slate-900 border-8 border-white shadow-2xl group">
+      {/* Instructions Bar */}
+      {isActive && (
+        <div className="mb-6 bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center space-x-4">
+          <div className="p-2 bg-amber-100 rounded-xl text-amber-600">
+            <Zap size={20} />
+          </div>
+          <p className="text-sm font-bold text-amber-800">
+            Face the camera clearly. Make sure your face is bright and centered. Your cartoon mask will appear automatically!
+          </p>
+        </div>
+      )}
+
+      <div className="relative w-full h-[80vh] rounded-[3rem] overflow-hidden bg-slate-900 border-8 border-white shadow-2xl group">
         {/* Full Screen Camera Background */}
         {!isActive ? (
           <div className="flex flex-col items-center justify-center h-full text-white/50 space-y-8 p-12 text-center bg-slate-900">
@@ -325,6 +353,60 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
               ref={overlayCanvasRef} 
               className="absolute inset-0 w-full h-full object-cover mirror pointer-events-none"
             />
+
+            {/* Face Guide Overlay */}
+            {!isFaceDetected && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-64 h-80 border-4 border-dashed border-white/30 rounded-[100px] flex flex-col items-center justify-center">
+                  <div className="w-full h-full bg-white/5 rounded-[100px] backdrop-blur-[2px]" />
+                  <p className="absolute bottom-12 text-white/70 text-xs font-black uppercase tracking-widest">Place face inside</p>
+                </div>
+              </div>
+            )}
+
+            {/* Visual Aid Overlay (Numbers/Icons) */}
+            {isFaceDetected && (
+              <div className="absolute top-24 right-12 flex flex-col items-end space-y-4 pointer-events-none">
+                {subjectName.toLowerCase().includes('math') && (
+                  <motion.div 
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ 
+                      scale: 1, 
+                      opacity: 1,
+                      y: [0, -10, 0]
+                    }}
+                    transition={{
+                      y: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+                    }}
+                    className="bg-white/90 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border-4 border-indigo-500 flex flex-col items-center"
+                  >
+                    <span className="text-6xl font-black text-indigo-600 mb-2">1 + 2 = 3</span>
+                    <div className="flex space-x-2">
+                      <span className="text-4xl">🍎</span>
+                      <span className="text-4xl">+</span>
+                      <span className="text-4xl">🍎🍎</span>
+                    </div>
+                  </motion.div>
+                )}
+                {subjectName.toLowerCase().includes('science') && (
+                  <motion.div 
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ 
+                      scale: 1, 
+                      opacity: 1,
+                      y: [0, -10, 0]
+                    }}
+                    transition={{
+                      y: { duration: 2.5, repeat: Infinity, ease: "easeInOut" }
+                    }}
+                    className="bg-white/90 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border-4 border-green-500 flex flex-col items-center"
+                  >
+                    <span className="text-6xl font-black text-green-600 mb-2">🌱 ➔ 🌳</span>
+                    <p className="text-xs font-black text-green-700 uppercase tracking-widest">Growth Cycle</p>
+                  </motion.div>
+                )}
+              </div>
+            )}
             
             {/* Status Overlays */}
             <div className="absolute top-8 left-8 flex flex-col space-y-3">
@@ -400,10 +482,22 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none w-full px-12"
               >
-                <div className="bg-indigo-600/90 backdrop-blur-md text-white px-8 py-4 rounded-3xl shadow-2xl border border-white/20">
-                  <p className="text-lg font-black uppercase tracking-tighter">Face the camera to wear your mask!</p>
+                <div className="bg-indigo-600/90 backdrop-blur-md text-white px-8 py-6 rounded-[2.5rem] shadow-2xl border border-white/20">
+                  <p className="text-xl font-black uppercase tracking-tighter mb-2">Looking for your face...</p>
+                  <p className="text-sm font-medium text-indigo-100">Make sure your face is bright and centered!</p>
+                  
+                  {showLowLightWarning && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-2xl flex items-center justify-center space-x-2"
+                    >
+                      <AlertCircle size={16} className="text-red-300" />
+                      <span className="text-xs font-bold text-red-100">⚠ Low light detected? Move to a brighter spot!</span>
+                    </motion.div>
+                  )}
                 </div>
               </motion.div>
             )}
