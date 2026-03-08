@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Subject, EducationLevel, CharacterBuddy } from '../types';
 import { generateLesson, generateSpeech } from '../services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Sparkles, Brain, Play, CheckCircle2, AlertCircle, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Sparkles, Brain, Play, CheckCircle2, AlertCircle, Volume2, VolumeX, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import confetti from 'canvas-confetti';
 import { VoicePractice } from './VoicePractice';
@@ -25,6 +25,7 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
   const [quizResults, setQuizResults] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isGeneratingDemo, setIsGeneratingDemo] = useState(false);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [practiceMode, setPracticeMode] = useState<'audio' | 'visual'>('audio');
 
@@ -97,6 +98,41 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
       }
     }
   }, [engagementFeedback?.feedback]);
+
+  const handleGenerateCartoonDemo = async () => {
+    if (!lesson) return;
+    setIsGeneratingDemo(true);
+    try {
+      const visualContext = subject.name.toLowerCase().includes('math') 
+        ? `Educational math visual: ${lesson.title}. Show objects being counted or added clearly (e.g., oranges, apples, or farm animals). Large visible numbers.`
+        : `Educational scene: ${lesson.title}.`;
+
+      const prompt = `Create a bright, high-quality, vibrant educational cartoon illustration for a primary school student. 
+        Setting: Friendly Nigerian classroom or local setting (e.g., market, farm).
+        Characters: ${character.name} teaching the student.
+        Topic: ${lesson.title}.
+        Visual details: ${visualContext} ${lesson.cartoonDescription}.
+        Style: Modern 3D cartoon, bright colors, friendly, child-safe, educational.`;
+
+      const res = await fetch('/api/generate-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate cartoon');
+
+      setLesson((prev: any) => ({
+        ...prev,
+        cartoonImageUrl: `data:${data.mimeType};base64,${data.imageBase64}`
+      }));
+    } catch (error) {
+      console.error('Cartoon generation failed:', error);
+    } finally {
+      setIsGeneratingDemo(false);
+    }
+  };
 
   const handleQuizSubmit = () => {
     setSubmitted(true);
@@ -210,34 +246,55 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-900 rounded-[2rem] overflow-hidden aspect-video relative group shadow-2xl"
+            className="bg-slate-900 rounded-[2.5rem] overflow-hidden aspect-video relative group shadow-2xl border-4 border-white"
           >
-            <img 
-              src={lesson.cartoonImageUrl || `https://picsum.photos/seed/${lesson.title.replace(/\s/g, '')}/1200/675`}
-              alt="Lesson Visualization"
-              className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-black/20">
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-3xl max-w-md">
-                <p className="text-white text-lg font-medium italic leading-relaxed">
-                  "{lesson.cartoonDescription}"
-                </p>
-                <div className="mt-4 flex items-center justify-center space-x-4 text-white/50 text-xs">
-                  <div className="flex items-center space-x-2">
-                    <Play size={12} />
-                    <span>Interactive Cartoon Demonstration</span>
-                  </div>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleSpeak(lesson.cartoonDescription); }}
-                    className="flex items-center space-x-1 px-2 py-1 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-                  >
-                    <Volume2 size={12} />
-                    <span>Listen</span>
-                  </button>
-                </div>
+            {isGeneratingDemo ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-white space-y-4">
+                <RefreshCw size={40} className="animate-spin text-indigo-400" />
+                <p className="text-xs font-black uppercase tracking-widest animate-pulse">Generating Cartoon Demo...</p>
               </div>
-            </div>
+            ) : (
+              <>
+                <img 
+                  src={lesson.cartoonImageUrl || `https://picsum.photos/seed/${lesson.title.replace(/\s/g, '')}/1200/675`}
+                  alt="Lesson Visualization"
+                  className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-end p-6 md:p-10 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
+                  <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 md:p-6 rounded-3xl max-w-2xl w-full">
+                    <p className="text-white text-sm md:text-lg font-medium italic leading-relaxed mb-4">
+                      "{lesson.cartoonDescription}"
+                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center space-x-4">
+                        <button 
+                          onClick={() => handleSpeak(lesson.cartoonDescription)}
+                          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                            isSpeaking ? 'bg-red-500 text-white' : 'bg-white/20 text-white hover:bg-white/30'
+                          }`}
+                        >
+                          <Volume2 size={14} />
+                          <span>Listen</span>
+                        </button>
+                        <button 
+                          onClick={handleGenerateCartoonDemo}
+                          disabled={isGeneratingDemo}
+                          className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"
+                        >
+                          <RefreshCw size={14} className={isGeneratingDemo ? 'animate-spin' : ''} />
+                          <span>Regenerate Demo</span>
+                        </button>
+                      </div>
+                      <div className="flex items-center space-x-2 text-white/60 text-[10px] font-black uppercase tracking-widest">
+                        <Play size={12} />
+                        <span>Interactive Demo</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </motion.div>
 
           {/* Lesson Content */}

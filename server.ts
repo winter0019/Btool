@@ -13,7 +13,11 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPE
 // API Routes (Only OpenAI fallbacks if needed, but primary logic moved to frontend)
 app.post("/api/generate-images", async (req, res) => {
   try {
-    const { prompt, size = "1024x1024", model = "gpt-image-1" } = req.body;
+    const { prompt } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt is required" });
+    }
 
     if (!process.env.OPENAI_API_KEY) {
       return res.status(503).json({ error: "OpenAI API key not configured" });
@@ -23,21 +27,41 @@ app.post("/api/generate-images", async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model,
+        model: "gpt-image-1",
         prompt,
-        size,
-        response_format: "b64_json"
-      })
+        size: "1024x1024",
+        quality: "medium",
+        response_format: "b64_json",
+      }),
     });
 
     const data = await response.json();
-    res.status(response.status).json(data);
+
+    if (!response.ok) {
+      console.error("OpenAI API Error:", data);
+      return res.status(response.status).json(data);
+    }
+
+    const b64 = data?.data?.[0]?.b64_json;
+
+    if (!b64) {
+      return res.status(500).json({ error: "No image returned from OpenAI" });
+    }
+
+    return res.status(200).json({
+      imageBase64: b64,
+      mimeType: "image/png",
+      provider: "openai",
+    });
   } catch (error: any) {
     console.error("OpenAI Image Generation Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      error: "Cartoon generation failed",
+      message: error.message,
+    });
   }
 });
 

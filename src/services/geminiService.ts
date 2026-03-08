@@ -115,28 +115,39 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
 
     // Generate images using OpenAI via backend
     try {
-      const scenePrompt = `A high-quality, vibrant, educational cartoon illustration for a student. The scene features ${character.name} teaching about ${lessonData.title} in a friendly Nigerian classroom or setting. Description: ${lessonData.cartoonDescription}. Style: Modern 3D cartoon, bright colors, friendly, educational.`;
-      const characterPrompt = `A clean, high-quality portrait of ${character.name}. Style: 3D cartoon headshot, white background, friendly expression, perfect for a mask sticker. No background elements.`;
+      const visualContext = subject.name.toLowerCase().includes('math') 
+        ? `Educational math visual: ${lessonData.title}. Show objects being counted or added clearly (e.g., oranges, apples, or farm animals). Large visible numbers.`
+        : `Educational scene: ${lessonData.title}.`;
+
+      const scenePrompt = `Create a bright, high-quality, vibrant educational cartoon illustration for a primary school student. 
+        Setting: Friendly Nigerian classroom or local setting (e.g., market, farm).
+        Characters: ${character.name} (${character.description}) teaching the student.
+        Topic: ${lessonData.title}.
+        Visual details: ${visualContext} ${lessonData.cartoonDescription}.
+        Style: Modern 3D cartoon, bright colors, friendly, child-safe, educational.`;
+
+      const characterPrompt = `A clean, high-quality 3D cartoon portrait of ${character.name}. 
+        Style: Friendly expression, white background, perfect for a mask sticker. No background elements.`;
 
       const [sceneResponse, charResponse] = await Promise.all([
         fetch('/api/generate-images', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: scenePrompt, model: "gpt-image-1" })
+          body: JSON.stringify({ prompt: scenePrompt })
         }).then(r => r.json()),
         fetch('/api/generate-images', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: characterPrompt, model: "gpt-image-1" })
+          body: JSON.stringify({ prompt: characterPrompt })
         }).then(r => r.json())
       ]);
 
-      if (sceneResponse.data?.[0]?.b64_json) {
-        lessonData.cartoonImageUrl = `data:image/png;base64,${sceneResponse.data[0].b64_json}`;
+      if (sceneResponse.imageBase64) {
+        lessonData.cartoonImageUrl = `data:${sceneResponse.mimeType || 'image/png'};base64,${sceneResponse.imageBase64}`;
       }
 
-      if (charResponse.data?.[0]?.b64_json) {
-        lessonData.characterImageUrl = `data:image/png;base64,${charResponse.data[0].b64_json}`;
+      if (charResponse.imageBase64) {
+        lessonData.characterImageUrl = `data:${charResponse.mimeType || 'image/png'};base64,${charResponse.imageBase64}`;
       }
     } catch (err) {
       console.error("Failed to generate images with OpenAI:", err);
