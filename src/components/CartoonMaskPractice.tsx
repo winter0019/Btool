@@ -53,6 +53,8 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
 
   const requestRef = useRef<number | undefined>(undefined);
 
+  const [showAnswer, setShowAnswer] = useState(false);
+
   // Pre-load mask images
   useEffect(() => {
     MASK_OPTIONS.forEach(mask => {
@@ -83,6 +85,16 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
     };
     loadModel();
   }, []);
+
+  useEffect(() => {
+    if (isFaceDetected && !showAnswer) {
+      const timer = setTimeout(() => setShowAnswer(true), 3000);
+      return () => clearTimeout(timer);
+    }
+    if (!isFaceDetected) {
+      setShowAnswer(false);
+    }
+  }, [isFaceDetected, showAnswer]);
 
   const startCamera = async () => {
     try {
@@ -283,58 +295,97 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
   };
 
   return (
-    <div className="bg-white p-6 md:p-10 rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-slate-100">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
-        <div className="flex items-center space-x-5">
-          <div className="p-4 bg-indigo-600 rounded-3xl text-white shadow-xl shadow-indigo-100">
-            <Camera size={28} />
+    <div className="bg-slate-50 p-4 md:p-6 rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-slate-100 max-w-5xl mx-auto">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between mb-4 px-4">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-100">
+            <Camera size={20} />
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Cartoon Mask Mode</h3>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Wear a mask & narrate your story!</p>
+            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">Mask Mode</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Learn with your character!</p>
           </div>
         </div>
-        <div className="flex items-center space-x-3 bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
-          <Sparkles size={16} className="text-indigo-600" />
-          <span className="text-xs font-black text-indigo-600 uppercase tracking-widest">AI Face Tracking</span>
-        </div>
+        
+        {isActive && (
+          <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+            <div className={`w-2 h-2 rounded-full ${isFaceDetected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
+              {isFaceDetected ? 'Mask Active' : 'Looking for Face...'}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Instructions Bar */}
-      {isActive && (
-        <div className="mb-6 bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center space-x-4">
-          <div className="p-2 bg-amber-100 rounded-xl text-amber-600">
-            <Zap size={20} />
-          </div>
-          <p className="text-sm font-bold text-amber-800">
-            Face the camera clearly. Make sure your face is bright and centered. Your cartoon mask will appear automatically!
-          </p>
-        </div>
-      )}
+      <div className="relative w-full aspect-[3/4] md:aspect-video rounded-[2.5rem] overflow-hidden bg-slate-900 border-4 border-white shadow-xl group">
+        {/* Top Section: Floating Lesson Bubble */}
+        <AnimatePresence>
+          {isActive && isFaceDetected && (
+            <motion.div 
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              className="absolute top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-xs px-4 pointer-events-none"
+            >
+              <div className="bg-white/90 backdrop-blur-xl p-3 rounded-3xl shadow-2xl border-2 border-indigo-500 flex flex-col items-center text-center">
+                <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-1">Current Lesson</p>
+                
+                {subjectName.toLowerCase().includes('math') ? (
+                  <div className="flex flex-col items-center">
+                    <div className="flex items-center space-x-3 mb-1">
+                      <span className="text-2xl">🍎</span>
+                      <span className="text-xl font-black text-slate-400">+</span>
+                      <span className="text-2xl">🍎🍎</span>
+                    </div>
+                    <h4 className="text-3xl font-black text-indigo-600 tracking-tighter">
+                      1 + 2 = {showAnswer ? '3' : '?'}
+                    </h4>
+                    {showAnswer && (
+                      <motion.p 
+                        initial={{ scale: 0 }} 
+                        animate={{ scale: 1 }} 
+                        className="text-[10px] font-bold text-indigo-400 mt-0.5 uppercase"
+                      >
+                        Three Apples!
+                      </motion.p>
+                    )}
+                  </div>
+                ) : subjectName.toLowerCase().includes('science') ? (
+                  <div className="flex flex-col items-center">
+                    <div className="text-3xl mb-1">🌱 ➔ 🌳</div>
+                    <h4 className="text-lg font-black text-green-600 uppercase tracking-tight">Growth Cycle</h4>
+                  </div>
+                ) : (
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">{topic}</h4>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      <div className="relative w-full h-[80vh] rounded-[3rem] overflow-hidden bg-slate-900 border-8 border-white shadow-2xl group">
         {/* Full Screen Camera Background */}
         {!isActive ? (
-          <div className="flex flex-col items-center justify-center h-full text-white/50 space-y-8 p-12 text-center bg-slate-900">
+          <div className="flex flex-col items-center justify-center h-full text-white/50 space-y-6 p-8 text-center bg-slate-900">
             {isModelLoading ? (
               <div className="flex flex-col items-center space-y-4">
-                <RefreshCw size={48} className="animate-spin text-indigo-400" />
-                <p className="text-sm font-bold uppercase tracking-widest">Waking up the AI...</p>
+                <RefreshCw size={40} className="animate-spin text-indigo-400" />
+                <p className="text-xs font-bold uppercase tracking-widest">Waking up the AI...</p>
               </div>
             ) : (
               <>
-                <div className="p-8 bg-white/5 rounded-full border border-white/10">
-                  <VideoOff size={64} />
+                <div className="p-6 bg-white/5 rounded-full border border-white/10">
+                  <VideoOff size={48} />
                 </div>
                 <div>
-                  <h4 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Ready for your mask?</h4>
-                  <p className="text-slate-400 text-sm font-medium">Face the camera to wear your {selectedMask.name} mask!</p>
+                  <h4 className="text-xl font-black text-white mb-1 uppercase tracking-tight">Ready for your mask?</h4>
+                  <p className="text-slate-400 text-xs font-medium">Wear your {selectedMask.name} mask and start learning!</p>
                 </div>
                 <button 
                   onClick={startCamera}
-                  className="px-12 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-3xl font-black uppercase tracking-widest transition-all shadow-2xl hover:scale-105 active:scale-95 flex items-center space-x-3"
+                  className="px-10 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl hover:scale-105 active:scale-95 flex items-center space-x-3"
                 >
-                  <Camera size={24} />
+                  <Camera size={20} />
                   <span>Open Camera</span>
                 </button>
               </>
@@ -354,156 +405,110 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
               className="absolute inset-0 w-full h-full object-cover mirror pointer-events-none"
             />
 
-            {/* Face Guide Overlay */}
+            {/* Face Guide Overlay - Clean Circle */}
             {!isFaceDetected && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-64 h-80 border-4 border-dashed border-white/30 rounded-[100px] flex flex-col items-center justify-center">
-                  <div className="w-full h-full bg-white/5 rounded-[100px] backdrop-blur-[2px]" />
-                  <p className="absolute bottom-12 text-white/70 text-xs font-black uppercase tracking-widest">Place face inside</p>
+                <div className="w-64 h-64 border-4 border-dashed border-white/40 rounded-full flex flex-col items-center justify-center">
+                  <div className="w-full h-full bg-white/5 rounded-full backdrop-blur-[1px]" />
+                  <p className="absolute -bottom-10 text-white/80 text-[10px] font-black uppercase tracking-widest bg-black/40 px-4 py-1 rounded-full backdrop-blur-md">
+                    Place face inside circle
+                  </p>
                 </div>
-              </div>
-            )}
-
-            {/* Visual Aid Overlay (Numbers/Icons) */}
-            {isFaceDetected && (
-              <div className="absolute top-24 right-12 flex flex-col items-end space-y-4 pointer-events-none">
-                {subjectName.toLowerCase().includes('math') && (
-                  <motion.div 
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ 
-                      scale: 1, 
-                      opacity: 1,
-                      y: [0, -10, 0]
-                    }}
-                    transition={{
-                      y: { duration: 2, repeat: Infinity, ease: "easeInOut" }
-                    }}
-                    className="bg-white/90 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border-4 border-indigo-500 flex flex-col items-center"
-                  >
-                    <span className="text-6xl font-black text-indigo-600 mb-2">1 + 2 = 3</span>
-                    <div className="flex space-x-2">
-                      <span className="text-4xl">🍎</span>
-                      <span className="text-4xl">+</span>
-                      <span className="text-4xl">🍎🍎</span>
-                    </div>
-                  </motion.div>
-                )}
-                {subjectName.toLowerCase().includes('science') && (
-                  <motion.div 
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ 
-                      scale: 1, 
-                      opacity: 1,
-                      y: [0, -10, 0]
-                    }}
-                    transition={{
-                      y: { duration: 2.5, repeat: Infinity, ease: "easeInOut" }
-                    }}
-                    className="bg-white/90 backdrop-blur-md p-6 rounded-[2rem] shadow-2xl border-4 border-green-500 flex flex-col items-center"
-                  >
-                    <span className="text-6xl font-black text-green-600 mb-2">🌱 ➔ 🌳</span>
-                    <p className="text-xs font-black text-green-700 uppercase tracking-widest">Growth Cycle</p>
-                  </motion.div>
-                )}
               </div>
             )}
             
-            {/* Status Overlays */}
-            <div className="absolute top-8 left-8 flex flex-col space-y-3">
-              <div className="bg-white/90 backdrop-blur-md px-6 py-3 rounded-2xl shadow-2xl border border-white flex items-center space-x-3">
-                <div className={`w-3 h-3 rounded-full ${isFaceDetected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                <span className="text-xs font-black text-slate-800 uppercase tracking-widest">
-                  {isFaceDetected ? 'Mask Active' : 'Looking for Face...'}
-                </span>
+            {/* Status Overlays - Minimal */}
+            <div className="absolute top-6 left-6 flex flex-col space-y-2">
+              <div className="bg-indigo-600/80 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-xl border border-indigo-400/30 flex items-center space-x-2">
+                <Sparkles size={12} className="text-white" />
+                <span className="text-[9px] font-black text-white uppercase tracking-widest">AI Tracking</span>
               </div>
-              
-              <div className="bg-indigo-600/90 backdrop-blur-md px-4 py-2 rounded-xl shadow-xl border border-indigo-400/30 flex items-center space-x-2">
-                <Sparkles size={14} className="text-white" />
-                <span className="text-[10px] font-black text-white uppercase tracking-widest">AI Face Tracking</span>
-              </div>
-            </div>
-
-            {/* Mask Selection Floating Carousel */}
-            <div className="absolute bottom-32 left-0 right-0 px-6">
-              <div className="max-w-2xl mx-auto bg-white/10 backdrop-blur-xl p-4 rounded-[2.5rem] border border-white/20 shadow-2xl">
-                <div className="flex items-center space-x-4 overflow-x-auto pb-2 custom-scrollbar no-scrollbar">
-                  {MASK_OPTIONS.map((mask) => (
-                    <button
-                      key={mask.id}
-                      onClick={() => setSelectedMask(mask)}
-                      className={`flex-shrink-0 flex flex-col items-center justify-center w-20 h-24 rounded-3xl transition-all border-2 ${
-                        selectedMask.id === mask.id 
-                          ? 'bg-white border-white text-indigo-600 shadow-xl scale-110' 
-                          : 'bg-black/20 border-transparent text-white hover:bg-black/40'
-                      }`}
-                    >
-                      <span className="text-3xl mb-1">{mask.emoji}</span>
-                      <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none px-1">{mask.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="absolute bottom-10 left-0 right-0 flex justify-center space-x-4">
-              <button
-                onClick={stopCamera}
-                className="p-5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-full transition-all border border-white/30"
-                title="Close Camera"
-              >
-                <X size={24} />
-              </button>
-              
-              <button
-                onClick={captureAndAnalyze}
-                disabled={isAnalyzing || !isFaceDetected}
-                className={`px-10 py-5 rounded-full font-black uppercase tracking-widest transition-all shadow-2xl flex items-center space-x-3 ${
-                  isAnalyzing || !isFaceDetected
-                    ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                    : 'bg-white text-indigo-600 hover:scale-105 active:scale-95'
-                }`}
-              >
-                {isAnalyzing ? (
-                  <>
-                    <RefreshCw size={20} className="animate-spin" />
-                    <span>Analyzing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap size={20} />
-                    <span>Finish Narration</span>
-                  </>
-                )}
-              </button>
             </div>
 
             {!isFaceDetected && (
               <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none w-full px-12"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none w-full px-8"
               >
-                <div className="bg-indigo-600/90 backdrop-blur-md text-white px-8 py-6 rounded-[2.5rem] shadow-2xl border border-white/20">
-                  <p className="text-xl font-black uppercase tracking-tighter mb-2">Looking for your face...</p>
-                  <p className="text-sm font-medium text-indigo-100">Make sure your face is bright and centered!</p>
-                  
-                  {showLowLightWarning && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-2xl flex items-center justify-center space-x-2"
-                    >
-                      <AlertCircle size={16} className="text-red-300" />
-                      <span className="text-xs font-bold text-red-100">⚠ Low light detected? Move to a brighter spot!</span>
-                    </motion.div>
-                  )}
-                </div>
+                {showLowLightWarning && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="p-4 bg-red-600/90 backdrop-blur-md border border-red-400 rounded-3xl flex items-center justify-center space-x-3 shadow-2xl"
+                  >
+                    <AlertCircle size={20} className="text-white" />
+                    <span className="text-sm font-black text-white uppercase tracking-tight">Too dark! Move to a brighter spot</span>
+                  </motion.div>
+                )}
               </motion.div>
             )}
           </>
         )}
       </div>
+
+      {/* Bottom Section: Mask Selector & Action Buttons */}
+      {isActive && (
+        <div className="mt-6 space-y-6">
+          {/* Mask Selection - Below Camera */}
+          <div className="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-3 px-2">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pick a Mask</p>
+              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{selectedMask.name} Selected</p>
+            </div>
+            <div className="flex items-center space-x-3 overflow-x-auto pb-2 custom-scrollbar no-scrollbar">
+              {MASK_OPTIONS.map((mask) => (
+                <button
+                  key={mask.id}
+                  onClick={() => setSelectedMask(mask)}
+                  className={`flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-2xl transition-all border-2 ${
+                    selectedMask.id === mask.id 
+                      ? 'bg-indigo-50 border-indigo-500 text-indigo-600 shadow-md scale-105' 
+                      : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="text-2xl mb-1">{mask.emoji}</span>
+                  <span className="text-[8px] font-black uppercase tracking-tighter text-center leading-none px-1">{mask.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Action Buttons - Bottom Row */}
+          <div className="flex items-center justify-center space-x-4">
+            <button
+              onClick={stopCamera}
+              className="p-4 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-2xl transition-all border border-slate-300 flex items-center space-x-2"
+              title="Close Camera"
+            >
+              <X size={20} />
+              <span className="text-xs font-black uppercase tracking-widest">Close</span>
+            </button>
+            
+            <button
+              onClick={captureAndAnalyze}
+              disabled={isAnalyzing || !isFaceDetected}
+              className={`flex-1 max-w-xs py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl flex items-center justify-center space-x-3 ${
+                isAnalyzing || !isFaceDetected
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-[1.02] active:scale-95'
+              }`}
+            >
+              {isAnalyzing ? (
+                <>
+                  <RefreshCw size={20} className="animate-spin" />
+                  <span>Analyzing...</span>
+                </>
+              ) : (
+                <>
+                  <Zap size={20} />
+                  <span>Finish Narration</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       <canvas ref={canvasRef} className="hidden" />
 
