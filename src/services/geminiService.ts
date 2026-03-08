@@ -7,14 +7,25 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Pr
   try {
     return await fn();
   } catch (err: any) {
+    const message = err.message || String(err);
+    const is429 = err.status === 429 || message.includes('429') || message.includes('RESOURCE_EXHAUSTED');
+    const is503 = err.status === 503 || message.includes('503') || message.includes('UNAVAILABLE');
+
     // If it's a 429 (Rate Limit), wait longer
-    if (err.status === 429 || (err.message && err.message.includes('429'))) {
+    if (is429) {
       const retryAfter = 45000; // 45 seconds for quota reset
       console.warn(`Quota exceeded (429), retrying in ${retryAfter / 1000}s...`);
       await new Promise(resolve => setTimeout(resolve, retryAfter));
       return withRetry(fn, retries, delay);
     }
     
+    // If it's a 503 (Service Unavailable), use exponential backoff
+    if (is503 && retries > 0) {
+      console.warn(`Gemini service unavailable (503), retrying in ${delay / 1000}s... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return withRetry(fn, retries - 1, delay * 2);
+    }
+
     if (retries <= 0) {
       console.error("Max retries reached. Error:", err);
       throw err;
@@ -100,6 +111,7 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
     }));
 
     const lessonData = JSON.parse(response.text || "{}");
+    lessonData.provider = "gemini";
 
     // Generate images using OpenAI via backend
     try {
@@ -151,12 +163,14 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
       });
       if (fallbackData.ok) {
         return await fallbackData.json();
+      } else {
+        console.error(`OpenAI fallback failed with status ${fallbackData.status}`);
       }
     } catch (fallbackErr) {
-      console.error("OpenAI fallback also failed:", fallbackErr);
+      console.error("OpenAI fallback request failed:", fallbackErr);
     }
 
-    console.error("Failed to fetch lesson:", err);
+    console.error("Both Gemini and OpenAI fallback failed. Original Gemini error:", err);
     return {
       title: "Lesson Error",
       content: "Sorry, we had trouble preparing this lesson. Please try again.",

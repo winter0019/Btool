@@ -63,7 +63,8 @@ app.post("/api/lesson-fallback", async (req, res) => {
       response_format: { type: "json_object" }
     });
     
-    res.json(JSON.parse(completion.choices[0].message.content || "{}"));
+    const lessonData = JSON.parse(completion.choices[0].message.content || "{}");
+    res.json({ provider: "openai", ...lessonData });
   } catch (error: any) {
     console.error("OpenAI Fallback Error:", error);
     res.status(error.status || 500).json({ error: error.message });
