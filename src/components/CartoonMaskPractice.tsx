@@ -1,11 +1,25 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Video, VideoOff, RefreshCw, Star, Sparkles, Camera, CheckCircle2, X, Zap, AlertCircle } from 'lucide-react';
+import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
+import {
+  RefreshCw,
+  Star,
+  Sparkles,
+  Camera,
+  CheckCircle2,
+  X,
+  Zap,
+  AlertCircle,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import * as faceDetection from '@tensorflow-models/face-detection';
-import '@tensorflow/tfjs-backend-webgl';
-import '@tensorflow/tfjs-core';
 import { analyzeVisualPractice, generateSpeech } from '../services/geminiService';
 import { EducationLevel } from '../types';
+import { useCartoonMaskTracking } from '../hooks/useCartoonMaskTracking';
+import {
+  ArithmeticMode,
+  PracticeQuestion,
+  PracticeResult,
+  generateArithmeticQuestions,
+  getImprovementSummary,
+} from '../utils/practiceEngine';
 
 interface MaskOption {
   id: string;
@@ -35,27 +49,35 @@ interface CartoonMaskPracticeProps {
   subjectName: string;
 }
 
-export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ context, characterName, level, topic, subjectName }) => {
+export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({
+  context,
+  characterName,
+  level,
+  topic,
+  subjectName,
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const activeMaskImageRef = useRef<HTMLImageElement | null>(null);
+
   const [isActive, setIsActive] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [selectedMask, setSelectedMask] = useState<MaskOption>(MASK_OPTIONS[0]);
-  const [detector, setDetector] = useState<faceDetection.FaceDetector | null>(null);
-  const [isModelLoading, setIsModelLoading] = useState(true);
   const [feedback, setFeedback] = useState<any>(null);
-  const [isFaceDetected, setIsFaceDetected] = useState(false);
-  const [showLowLightWarning, setShowLowLightWarning] = useState(false);
+
+  const [selectedMode, setSelectedMode] = useState<ArithmeticMode>('addition');
+  const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [studentAnswer, setStudentAnswer] = useState('');
+  const [results, setResults] = useState<PracticeResult[]>([]);
+  const [score, setScore] = useState(0);
+  const [sessionFinished, setSessionFinished] = useState(false);
+  const [narratorMessage, setNarratorMessage] = useState('Choose a topic and start practicing.');
+
   const maskImagesRef = useRef<Record<string, HTMLImageElement>>({});
-  const detectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const requestRef = useRef<number | undefined>(undefined);
-
-  const [showAnswer, setShowAnswer] = useState(false);
-
-  // Pre-load mask images
   useEffect(() => {
     MASK_OPTIONS.forEach(mask => {
       const img = new Image();
@@ -66,46 +88,46 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
     });
   }, []);
 
-  // Load face detection model
   useEffect(() => {
-    const loadModel = async () => {
-      try {
-        const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
-        const detectorConfig: faceDetection.MediaPipeFaceDetectorTfjsModelConfig = {
-          runtime: 'tfjs',
-          maxFaces: 1,
-        };
-        const newDetector = await faceDetection.createDetector(model, detectorConfig);
-        setDetector(newDetector);
-        setIsModelLoading(false);
-      } catch (err) {
-        console.error("Error loading face detection model:", err);
-        setIsModelLoading(false);
-      }
-    };
-    loadModel();
-  }, []);
+    activeMaskImageRef.current = maskImagesRef.current[selectedMask.id] ?? null;
+  }, [selectedMask]);
 
-  useEffect(() => {
-    if (isFaceDetected && !showAnswer) {
-      const timer = setTimeout(() => setShowAnswer(true), 3000);
-      return () => clearTimeout(timer);
+  const { isModelLoading, isFaceDetected, showLowLightWarning } = useCartoonMaskTracking(
+    videoRef,
+    overlayCanvasRef,
+    activeMaskImageRef,
+    isActive
+  );
+
+  const currentQuestion = useMemo(
+    () => questions[currentIndex] ?? null,
+    [questions, currentIndex]
+  );
+
+  const speakText = useCallback(async (text: string) => {
+    setNarratorMessage(text);
+    try {
+      const audioUrl = await generateSpeech(text);
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        await audio.play();
+      }
+    } catch (error) {
+      console.error('Speech failed:', error);
     }
-    if (!isFaceDetected) {
-      setShowAnswer(false);
-    }
-  }, [isFaceDetected, showAnswer]);
+  }, []);
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: 1280, height: 720, facingMode: 'user' } 
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720, facingMode: 'user' },
+        audio: false,
       });
       setStream(mediaStream);
       setIsActive(true);
       setFeedback(null);
     } catch (err) {
-      console.error("Error accessing camera:", err);
+      console.error('Error accessing camera:', err);
     }
   };
 
@@ -113,142 +135,65 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
     stream?.getTracks().forEach(track => track.stop());
     setStream(null);
     setIsActive(false);
-    if (requestRef.current !== undefined) {
-      cancelAnimationFrame(requestRef.current);
-    }
   }, [stream]);
-
-  const smoothedFaceRef = useRef({
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-    rotation: 0,
-    initialized: false
-  });
-
-  const detectFace = useCallback(async () => {
-    if (!detector || !videoRef.current || !overlayCanvasRef.current || !isActive) return;
-
-    const video = videoRef.current;
-    const canvas = overlayCanvasRef.current;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) {
-      requestRef.current = requestAnimationFrame(detectFace);
-      return;
-    }
-
-    // Set canvas dimensions to match video
-    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-    }
-
-    try {
-      const faces = await detector.estimateFaces(video, { flipHorizontal: false });
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (faces.length > 0) {
-        setIsFaceDetected(true);
-        setShowLowLightWarning(false);
-        if (detectionTimeoutRef.current) {
-          clearTimeout(detectionTimeoutRef.current);
-          detectionTimeoutRef.current = null;
-        }
-
-        const face = faces[0];
-        const { box, keypoints } = face;
-        
-        // Calculate rotation based on eyes
-        let rotation = 0;
-        if (keypoints && keypoints.length >= 2) {
-          const leftEye = keypoints[0]; // MediaPipe indices: 0: left eye, 1: right eye
-          const rightEye = keypoints[1];
-          if (leftEye && rightEye) {
-            rotation = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x);
-          }
-        }
-
-        // Smoothing factor (0.1 = very smooth, 1.0 = no smoothing)
-        const alpha = 0.3;
-        
-        if (!smoothedFaceRef.current.initialized) {
-          smoothedFaceRef.current = {
-            x: box.xMin,
-            y: box.yMin,
-            width: box.width,
-            height: box.height,
-            rotation: rotation,
-            initialized: true
-          };
-        } else {
-          smoothedFaceRef.current = {
-            x: smoothedFaceRef.current.x * (1 - alpha) + box.xMin * alpha,
-            y: smoothedFaceRef.current.y * (1 - alpha) + box.yMin * alpha,
-            width: smoothedFaceRef.current.width * (1 - alpha) + box.width * alpha,
-            height: smoothedFaceRef.current.height * (1 - alpha) + box.height * alpha,
-            rotation: smoothedFaceRef.current.rotation * (1 - alpha) + rotation * alpha,
-            initialized: true
-          };
-        }
-
-        const sFace = smoothedFaceRef.current;
-        
-        // Draw mask
-        const maskImg = maskImagesRef.current[selectedMask.id];
-        
-        if (maskImg) {
-          const padding = sFace.width * 0.45;
-          const maskWidth = sFace.width + padding * 2;
-          const maskHeight = maskWidth;
-          
-          // Center of the face box
-          const centerX = sFace.x + sFace.width / 2;
-          const centerY = sFace.y + sFace.height / 2 - padding * 0.2;
-
-          ctx.save();
-          ctx.translate(centerX, centerY);
-          ctx.rotate(sFace.rotation);
-          
-          // Draw image centered at the translated origin
-          ctx.drawImage(maskImg, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
-          
-          ctx.restore();
-        }
-      } else {
-        setIsFaceDetected(false);
-        smoothedFaceRef.current.initialized = false;
-        
-        if (!detectionTimeoutRef.current && isActive) {
-          detectionTimeoutRef.current = setTimeout(() => {
-            setShowLowLightWarning(true);
-          }, 5000);
-        }
-      }
-    } catch (err) {
-      console.error("Face detection error:", err);
-    }
-
-    requestRef.current = requestAnimationFrame(detectFace);
-  }, [detector, isActive, selectedMask]);
-
-  useEffect(() => {
-    if (isActive) {
-      requestRef.current = requestAnimationFrame(detectFace);
-    }
-    return () => {
-      if (requestRef.current) {
-        cancelAnimationFrame(requestRef.current);
-      }
-    };
-  }, [isActive, detectFace]);
 
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.srcObject = isActive ? stream : null;
     }
   }, [isActive, stream]);
+
+  const startPractice = async (mode: ArithmeticMode) => {
+    const generated = generateArithmeticQuestions(mode, 5);
+    setSelectedMode(mode);
+    setQuestions(generated);
+    setCurrentIndex(0);
+    setStudentAnswer('');
+    setResults([]);
+    setScore(0);
+    setSessionFinished(false);
+
+    await speakText(`Great. Let us practice ${mode}. First question. ${generated[0].text}`);
+  };
+
+  const submitAnswer = async () => {
+    if (!currentQuestion) return;
+
+    const numeric = Number(studentAnswer);
+    const isCorrect = numeric === currentQuestion.answer;
+
+    const result: PracticeResult = {
+      question: currentQuestion.text,
+      studentAnswer: Number.isNaN(numeric) ? null : numeric,
+      correctAnswer: currentQuestion.answer,
+      isCorrect,
+      mode: currentQuestion.mode,
+    };
+
+    setResults(prev => [...prev, result]);
+    if (isCorrect) {
+      setScore(prev => prev + 1);
+      await speakText('Correct! Well done.');
+    } else {
+      await speakText(`Incorrect. The correct answer is ${currentQuestion.answer}.`);
+    }
+
+    setStudentAnswer('');
+
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < questions.length) {
+      setCurrentIndex(nextIndex);
+      setTimeout(() => {
+        void speakText(`Next question. ${questions[nextIndex].text}`);
+      }, 500);
+    } else {
+      setSessionFinished(true);
+      const allResults = [...results, result];
+      const finalScore = isCorrect ? score + 1 : score;
+      const summary = `You scored ${finalScore} out of ${questions.length}. ${getImprovementSummary(allResults)}`;
+      await speakText(summary);
+    }
+  };
 
   const captureAndAnalyze = async () => {
     if (!videoRef.current || !canvasRef.current || isAnalyzing) return;
@@ -259,40 +204,32 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
     const video = videoRef.current;
     const overlayCanvas = overlayCanvasRef.current;
 
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
+    if (video.videoWidth === 0 || video.videoHeight === 0 || !ctx || !overlayCanvas) {
       setIsAnalyzing(false);
       return;
     }
 
-    if (ctx && overlayCanvas) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      // Draw video frame
-      ctx.drawImage(video, 0, 0);
-      // Draw mask overlay
-      ctx.drawImage(overlayCanvas, 0, 0);
-      
-      const imageData = canvas.toDataURL('image/jpeg');
-      
-      stopCamera();
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-      try {
-        const result = await analyzeVisualPractice(imageData, characterName, context);
-        setFeedback(result);
-        
-        const audioUrl = await generateSpeech(result.feedback);
-        if (audioUrl) {
-          const audio = new Audio(audioUrl);
-          audio.play();
-        }
-      } catch (err) {
-        console.error("Analysis failed:", err);
-      } finally {
-        setIsAnalyzing(false);
-      }
+    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(overlayCanvas, 0, 0);
+
+    const imageData = canvas.toDataURL('image/jpeg');
+    stopCamera();
+
+    try {
+      const result = await analyzeVisualPractice(imageData, characterName, context);
+      setFeedback(result);
+      await speakText(result.feedback);
+    } catch (err) {
+      console.error('Analysis failed:', err);
+    } finally {
+      setIsAnalyzing(false);
     }
   };
+
+  const subjectIsMath = subjectName.toLowerCase().includes('math');
 
   return (
     <div className="bg-slate-50 p-4 md:p-6 rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-slate-100 max-w-5xl mx-auto">
@@ -318,10 +255,32 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
         )}
       </div>
 
+      {/* Math Practice Controls - Only show when not in session or finished */}
+      {subjectIsMath && !isActive && !sessionFinished && (
+        <div className="mb-6 bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Practice Topics</p>
+          <div className="flex flex-wrap gap-2">
+            {(['addition', 'subtraction', 'multiplication', 'division'] as ArithmeticMode[]).map(mode => (
+              <button
+                key={mode}
+                onClick={() => void startPractice(mode)}
+                className={`px-4 py-3 rounded-2xl text-sm font-black uppercase tracking-wide transition ${
+                  selectedMode === mode
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-50 text-slate-700 border border-slate-200'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="relative w-full aspect-[3/4] md:aspect-video rounded-[2.5rem] overflow-hidden bg-slate-900 border-4 border-white shadow-xl group">
         {/* Top Section: Floating Lesson Bubble */}
         <AnimatePresence>
-          {isActive && isFaceDetected && (
+          {isActive && currentQuestion && !sessionFinished && (
             <motion.div 
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -329,36 +288,15 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
               className="absolute top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-xs px-4 pointer-events-none"
             >
               <div className="bg-white/90 backdrop-blur-xl p-3 rounded-3xl shadow-2xl border-2 border-indigo-500 flex flex-col items-center text-center">
-                <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-1">Current Lesson</p>
-                
-                {subjectName.toLowerCase().includes('math') ? (
-                  <div className="flex flex-col items-center">
-                    <div className="flex items-center space-x-3 mb-1">
-                      <span className="text-2xl">🍎</span>
-                      <span className="text-xl font-black text-slate-400">+</span>
-                      <span className="text-2xl">🍎🍎</span>
-                    </div>
-                    <h4 className="text-3xl font-black text-indigo-600 tracking-tighter">
-                      1 + 2 = {showAnswer ? '3' : '?'}
-                    </h4>
-                    {showAnswer && (
-                      <motion.p 
-                        initial={{ scale: 0 }} 
-                        animate={{ scale: 1 }} 
-                        className="text-[10px] font-bold text-indigo-400 mt-0.5 uppercase"
-                      >
-                        Three Apples!
-                      </motion.p>
-                    )}
-                  </div>
-                ) : subjectName.toLowerCase().includes('science') ? (
-                  <div className="flex flex-col items-center">
-                    <div className="text-3xl mb-1">🌱 ➔ 🌳</div>
-                    <h4 className="text-lg font-black text-green-600 uppercase tracking-tight">Growth Cycle</h4>
-                  </div>
-                ) : (
-                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">{topic}</h4>
-                )}
+                <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-1">Question {currentIndex + 1}</p>
+                <h4 className="text-3xl font-black text-indigo-600 tracking-tighter mb-1">
+                  {currentQuestion.text}
+                </h4>
+                <div className="flex flex-wrap justify-center gap-1 text-xl">
+                  {currentQuestion.visual.map((item, idx) => (
+                    <span key={idx}>{item}</span>
+                  ))}
+                </div>
               </div>
             </motion.div>
           )}
@@ -375,7 +313,7 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
             ) : (
               <>
                 <div className="p-6 bg-white/5 rounded-full border border-white/10">
-                  <VideoOff size={48} />
+                  <Camera size={48} />
                 </div>
                 <div>
                   <h4 className="text-xl font-black text-white mb-1 uppercase tracking-tight">Ready for your mask?</h4>
@@ -398,11 +336,11 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
               autoPlay 
               muted 
               playsInline 
-              className="w-full h-full object-cover mirror"
+              className="w-full h-full object-cover scale-x-[-1]"
             />
             <canvas 
               ref={overlayCanvasRef} 
-              className="absolute inset-0 w-full h-full object-cover mirror pointer-events-none"
+              className="absolute inset-0 w-full h-full object-cover scale-x-[-1] pointer-events-none"
             />
 
             {/* Face Guide Overlay - Clean Circle */}
@@ -450,13 +388,38 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
       {/* Bottom Section: Mask Selector & Action Buttons */}
       {isActive && (
         <div className="mt-6 space-y-6">
+          {/* Answer Input for Math */}
+          {currentQuestion && !sessionFinished && (
+            <div className="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm flex items-center space-x-4">
+              <div className="flex-1">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 px-2">
+                  Your Answer
+                </label>
+                <input
+                  value={studentAnswer}
+                  onChange={e => setStudentAnswer(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && void submitAnswer()}
+                  inputMode="numeric"
+                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-lg font-bold outline-none focus:border-indigo-500 bg-slate-50"
+                  placeholder="Type here..."
+                />
+              </div>
+              <button
+                onClick={() => void submitAnswer()}
+                className="px-8 py-4 rounded-2xl bg-indigo-600 text-white font-black uppercase tracking-wide shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+              >
+                Check
+              </button>
+            </div>
+          )}
+
           {/* Mask Selection - Below Camera */}
           <div className="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3 px-2">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pick a Mask</p>
               <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{selectedMask.name} Selected</p>
             </div>
-            <div className="flex items-center space-x-3 overflow-x-auto pb-2 custom-scrollbar no-scrollbar">
+            <div className="flex items-center space-x-3 overflow-x-auto pb-2 no-scrollbar">
               {MASK_OPTIONS.map((mask) => (
                 <button
                   key={mask.id}
@@ -510,6 +473,32 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
         </div>
       )}
 
+      {/* Session Summary */}
+      {sessionFinished && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 bg-green-50 border border-green-100 rounded-[2.5rem] p-6 shadow-lg"
+        >
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="p-2 bg-green-100 rounded-xl">
+              <Star className="text-green-600 fill-green-600" size={24} />
+            </div>
+            <h5 className="text-xl font-black text-green-800 uppercase tracking-tight">Practice Summary</h5>
+          </div>
+          <div className="bg-white p-4 rounded-2xl mb-4 border border-green-100 shadow-sm">
+            <p className="text-2xl font-black text-green-600">Score: {score} / {questions.length}</p>
+            <p className="mt-2 text-slate-700 font-medium leading-relaxed">{getImprovementSummary(results)}</p>
+          </div>
+          <button 
+            onClick={() => void startPractice(selectedMode)}
+            className="w-full py-4 bg-green-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-green-700 transition-all shadow-xl"
+          >
+            Practice Again
+          </button>
+        </motion.div>
+      )}
+
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Feedback Section */}
@@ -518,7 +507,7 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-indigo-50 p-8 rounded-[2.5rem] border border-indigo-100 shadow-xl mt-8"
+            className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-indigo-100 shadow-xl mt-8"
           >
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
@@ -527,27 +516,27 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
                 </div>
                 <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">Mission Report</h4>
               </div>
-              <div className="px-6 py-2 bg-white rounded-2xl text-sm font-black text-indigo-600 shadow-md border border-indigo-50">
+              <div className="px-6 py-2 bg-indigo-50 rounded-2xl text-sm font-black text-indigo-600 shadow-sm border border-indigo-100">
                 ACTING SCORE: {feedback.actingScore}%
               </div>
             </div>
             
-            <div className="bg-white p-6 rounded-3xl shadow-sm mb-6 border border-indigo-50">
+            <div className="bg-slate-50 p-6 rounded-3xl mb-6 border border-slate-100">
               <p className="text-slate-700 italic font-bold text-lg leading-relaxed">"{feedback.feedback}"</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-green-100/50 p-6 rounded-3xl border border-green-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-green-50 p-5 rounded-3xl border border-green-100">
                 <div className="flex items-center space-x-2 mb-2">
-                  <CheckCircle2 size={18} className="text-green-600" />
-                  <p className="text-xs font-black text-green-700 uppercase tracking-widest">What you did well</p>
+                  <CheckCircle2 size={16} className="text-green-600" />
+                  <p className="text-[10px] font-black text-green-700 uppercase tracking-widest">Strengths</p>
                 </div>
                 <p className="text-sm text-green-800 leading-relaxed font-medium">{feedback.strengths}</p>
               </div>
-              <div className="bg-amber-100/50 p-6 rounded-3xl border border-amber-100">
+              <div className="bg-amber-50 p-5 rounded-3xl border border-amber-100">
                 <div className="flex items-center space-x-2 mb-2">
-                  <Sparkles size={18} className="text-amber-600" />
-                  <p className="text-xs font-black text-amber-700 uppercase tracking-widest">How to be even better</p>
+                  <Sparkles size={16} className="text-amber-600" />
+                  <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Improvements</p>
                 </div>
                 <p className="text-sm text-amber-800 leading-relaxed font-medium">{feedback.improvements}</p>
               </div>
@@ -556,7 +545,7 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({ contex
             <div className="mt-8 flex justify-center">
               <button 
                 onClick={startCamera}
-                className="flex items-center space-x-3 px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl hover:scale-105 active:scale-95"
+                className="flex items-center space-x-3 px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl hover:scale-105 active:scale-95"
               >
                 <RefreshCw size={20} />
                 <span>Try Another Mask</span>
