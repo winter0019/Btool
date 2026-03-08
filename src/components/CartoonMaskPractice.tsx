@@ -31,6 +31,9 @@ interface MaskOption {
 const MASK_OPTIONS: MaskOption[] = [
   { id: 'lion', name: 'Lion', emoji: '🦁', url: 'https://img.icons8.com/color/200/lion.png' },
   { id: 'rabbit', name: 'Rabbit', emoji: '🐰', url: 'https://img.icons8.com/color/200/rabbit.png' },
+  { id: 'monkey', name: 'Monkey', emoji: '🐒', url: 'https://img.icons8.com/color/200/monkey.png' },
+  { id: 'fox', name: 'Fox', emoji: '🦊', url: 'https://img.icons8.com/color/200/fox.png' },
+  { id: 'alien', name: 'Alien', emoji: '👽', url: 'https://img.icons8.com/color/200/alien.png' },
   { id: 'superhero', name: 'Hero', emoji: '🦸', url: 'https://img.icons8.com/color/200/superhero.png' },
   { id: 'princess', name: 'Princess', emoji: '👸', url: 'https://img.icons8.com/color/200/princess.png' },
   { id: 'robot', name: 'Robot', emoji: '🤖', url: 'https://img.icons8.com/color/200/robot.png' },
@@ -92,7 +95,7 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({
     activeMaskImageRef.current = maskImagesRef.current[selectedMask.id] ?? null;
   }, [selectedMask]);
 
-  const { isModelLoading, isFaceDetected, showLowLightWarning } = useCartoonMaskTracking(
+  const { isModelLoading, isFaceDetected, showLowLightWarning, isTooDark } = useCartoonMaskTracking(
     videoRef,
     overlayCanvasRef,
     activeMaskImageRef,
@@ -233,26 +236,65 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({
 
   return (
     <div className="bg-slate-50 p-4 md:p-6 rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-slate-100 max-w-5xl mx-auto">
-      {/* Compact Header */}
-      <div className="flex items-center justify-between mb-4 px-4">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-100">
-            <Camera size={20} />
+      {/* High-Tech Header */}
+      <div className="flex flex-col md:flex-row items-center justify-between mb-6 px-4 gap-4">
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-200 animate-pulse">
+              <Zap size={24} />
+            </div>
+            <div className="absolute -bottom-2 -right-2 p-1.5 bg-white rounded-lg shadow-md border border-slate-100">
+              <Camera size={12} className="text-indigo-600" />
+            </div>
           </div>
           <div>
-            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">Mask Mode</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Learn with your character!</p>
+            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none flex items-center">
+              B-TOOL
+              <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-md font-black tracking-widest">BRAIN TOOL</span>
+            </h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+              Mask Mode <span className="mx-1 text-slate-200">|</span> Learn with your character!
+            </p>
           </div>
         </div>
         
-        {isActive && (
-          <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-            <div className={`w-2 h-2 rounded-full ${isFaceDetected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
-              {isFaceDetected ? 'Mask Active' : 'Looking for Face...'}
-            </span>
+        <div className="flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-6 mr-4">
+            <div className="flex items-center space-x-2">
+              <Sparkles size={14} className="text-indigo-400" />
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Boosters</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <CheckCircle2 size={14} className="text-emerald-400" />
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Safe Zone</span>
+            </div>
           </div>
-        )}
+
+          {isActive ? (
+            <div className="flex items-center space-x-3">
+              {isTooDark && (
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="flex items-center space-x-1.5 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200 shadow-sm"
+                >
+                  <Zap size={12} className="text-amber-500" />
+                  <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Low Light</span>
+                </motion.div>
+              )}
+              <div className="flex items-center space-x-3 bg-slate-900 px-4 py-2 rounded-2xl shadow-xl border border-slate-800">
+                <div className={`w-2.5 h-2.5 rounded-full ${isFaceDetected ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]'}`} />
+                <span className="text-[10px] font-black text-white uppercase tracking-widest">
+                  {isFaceDetected ? 'AI Engine Active' : 'Looking for Face...'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
+              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">System Standby</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Math Practice Controls - Only show when not in session or finished */}
@@ -363,20 +405,20 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({
               </div>
             </div>
 
-            {!isFaceDetected && (
+            {isActive && (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none w-full px-8"
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center pointer-events-none w-full px-8 z-50"
               >
                 {showLowLightWarning && (
                   <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-4 bg-red-600/90 backdrop-blur-md border border-red-400 rounded-3xl flex items-center justify-center space-x-3 shadow-2xl"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-red-600/90 backdrop-blur-md border border-red-400 rounded-2xl flex items-center justify-center space-x-2 shadow-2xl mx-auto max-w-xs"
                   >
-                    <AlertCircle size={20} className="text-white" />
-                    <span className="text-sm font-black text-white uppercase tracking-tight">Too dark! Move to a brighter spot</span>
+                    <AlertCircle size={16} className="text-white" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Too dark! Move to a brighter spot</span>
                   </motion.div>
                 )}
               </motion.div>

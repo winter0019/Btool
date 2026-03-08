@@ -26,10 +26,31 @@ export const useCartoonMaskTracking = (
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const [showLowLightWarning, setShowLowLightWarning] = useState(false);
+  const [isTooDark, setIsTooDark] = useState(false);
 
   const detectorRef = useRef<faceLandmarksDetection.FaceLandmarksDetector | null>(null);
   const requestRef = useRef<number | null>(null);
   const lowLightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const brightnessCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const checkBrightness = (video: HTMLVideoElement) => {
+    if (!brightnessCanvasRef.current) {
+      brightnessCanvasRef.current = document.createElement('canvas');
+      brightnessCanvasRef.current.width = 40;
+      brightnessCanvasRef.current.height = 30;
+    }
+    const canvas = brightnessCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 128; // Default middle brightness
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let brightness = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      brightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+    }
+    return brightness / (data.length / 4);
+  };
 
   const smoothedRef = useRef<MaskTransform>({
     x: 0,
@@ -88,6 +109,12 @@ export const useCartoonMaskTracking = (
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Check brightness every ~30 frames
+    if (Math.random() < 0.03) {
+      const brightness = checkBrightness(video);
+      setIsTooDark(brightness < 45); // Threshold for "too dark"
+    }
+
     try {
       const faces = await detector.estimateFaces(video, { flipHorizontal: false });
 
@@ -95,10 +122,16 @@ export const useCartoonMaskTracking = (
         setIsFaceDetected(false);
         smoothedRef.current.visible = false;
 
-        if (!lowLightTimerRef.current) {
+        if (!lowLightTimerRef.current && isTooDark) {
           lowLightTimerRef.current = setTimeout(() => {
             setShowLowLightWarning(true);
-          }, 4000);
+          }, 2000);
+        } else if (!isTooDark) {
+          setShowLowLightWarning(false);
+          if (lowLightTimerRef.current) {
+            clearTimeout(lowLightTimerRef.current);
+            lowLightTimerRef.current = null;
+          }
         }
 
         requestRef.current = requestAnimationFrame(drawMask);
@@ -107,6 +140,7 @@ export const useCartoonMaskTracking = (
 
       setIsFaceDetected(true);
       setShowLowLightWarning(false);
+      setIsTooDark(false);
       if (lowLightTimerRef.current) {
         clearTimeout(lowLightTimerRef.current);
         lowLightTimerRef.current = null;
@@ -172,5 +206,6 @@ export const useCartoonMaskTracking = (
     isModelLoading,
     isFaceDetected,
     showLowLightWarning,
+    isTooDark,
   };
 };
