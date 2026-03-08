@@ -82,17 +82,30 @@ export const CartoonMaskPractice: React.FC<CartoonMaskPracticeProps> = ({
   const maskImagesRef = useRef<Record<string, HTMLImageElement>>({});
 
   useEffect(() => {
-    MASK_OPTIONS.forEach(mask => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = mask.url;
-      img.referrerPolicy = 'no-referrer';
-      maskImagesRef.current[mask.id] = img;
-    });
+    const loadImages = () => {
+      MASK_OPTIONS.forEach(mask => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          console.log(`Mask image loaded: ${mask.id}`);
+          if (mask.id === selectedMask.id) {
+            activeMaskImageRef.current = img;
+          }
+        };
+        img.onerror = (e) => console.error(`Failed to load mask: ${mask.id}`, e);
+        img.referrerPolicy = 'no-referrer';
+        img.src = mask.url;
+        maskImagesRef.current[mask.id] = img;
+      });
+    };
+    loadImages();
   }, []);
 
   useEffect(() => {
-    activeMaskImageRef.current = maskImagesRef.current[selectedMask.id] ?? null;
+    const img = maskImagesRef.current[selectedMask.id];
+    if (img) {
+      activeMaskImageRef.current = img;
+    }
   }, [selectedMask]);
 
   const { isModelLoading, isFaceDetected, showLowLightWarning, isTooDark } = useCartoonMaskTracking(

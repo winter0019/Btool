@@ -26,6 +26,7 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
   const [submitted, setSubmitted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isGeneratingDemo, setIsGeneratingDemo] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [practiceMode, setPracticeMode] = useState<'audio' | 'visual'>('audio');
 
@@ -102,6 +103,7 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
   const handleGenerateCartoonDemo = async () => {
     if (!lesson) return;
     setIsGeneratingDemo(true);
+    setGenerationError(null);
     try {
       const visualContext = subject.name.toLowerCase().includes('math') 
         ? `Educational math visual: ${lesson.title}. Show objects being counted or added clearly (e.g., oranges, apples, or farm animals). Large visible numbers.`
@@ -127,8 +129,9 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
         ...prev,
         cartoonImageUrl: `data:${data.mimeType};base64,${data.imageBase64}`
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Cartoon generation failed:', error);
+      setGenerationError(error.message || 'Failed to generate cartoon');
     } finally {
       setIsGeneratingDemo(false);
     }
@@ -253,6 +256,18 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
                 <RefreshCw size={40} className="animate-spin text-indigo-400" />
                 <p className="text-xs font-black uppercase tracking-widest animate-pulse">Generating Cartoon Demo...</p>
               </div>
+            ) : generationError ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center">
+                <AlertCircle size={40} className="text-red-400 mb-4" />
+                <p className="text-sm font-bold text-red-200 mb-2">Oops! Cartoon generation failed</p>
+                <p className="text-xs text-slate-400 mb-6 max-w-xs">{generationError}</p>
+                <button 
+                  onClick={handleGenerateCartoonDemo}
+                  className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                >
+                  Try Again
+                </button>
+              </div>
             ) : (
               <>
                 <img 
@@ -376,40 +391,55 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ level, subject, 
               <CheckCircle2 className="mr-2 text-green-500" />
               Quick Check
             </h3>
-            <div className="space-y-6 md:space-y-8">
-              {lesson?.quiz?.map((q: any, i: number) => (
-                <div key={i} className="space-y-3">
-                  <p className="font-medium text-slate-700 text-sm">{i + 1}. {q.question}</p>
-                  <div className="grid grid-cols-1 gap-2">
-                    {q.options?.map((opt: string, optIdx: number) => (
-                      <button
-                        key={`${i}-${optIdx}`}
-                        disabled={submitted}
-                        onClick={() => setQuizResults(prev => ({ ...prev, [i]: opt }))}
-                        className={`p-3 md:p-4 rounded-xl text-left text-sm transition-all border-2 ${
-                          quizResults[i] === opt 
-                            ? 'bg-indigo-50 border-indigo-500 text-indigo-700' 
-                            : 'bg-slate-50 border-transparent hover:border-slate-200 text-slate-600'
-                        } ${
-                          submitted && opt === q.answer ? 'bg-green-50 border-green-500 text-green-700' : ''
-                        } ${
-                          submitted && quizResults[i] === opt && opt !== q.answer ? 'bg-red-50 border-red-500 text-red-700' : ''
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
+            
+            {!lesson?.quiz || lesson.quiz.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <AlertCircle className="mx-auto text-slate-300 mb-2" size={32} />
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No quiz questions available for this lesson.</p>
+                <button 
+                  onClick={() => fetchLesson(topic)}
+                  className="mt-4 px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
+                >
+                  Regenerate Lesson
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6 md:space-y-8">
+                {lesson.quiz.map((q: any, i: number) => (
+                  <div key={i} className="space-y-3">
+                    <p className="font-medium text-slate-700 text-sm">{i + 1}. {q.question}</p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {q.options?.map((opt: string, optIdx: number) => (
+                        <button
+                          key={`${i}-${optIdx}`}
+                          disabled={submitted}
+                          onClick={() => setQuizResults(prev => ({ ...prev, [i]: opt }))}
+                          className={`p-3 md:p-4 rounded-xl text-left text-sm transition-all border-2 ${
+                            quizResults[i] === opt 
+                              ? 'bg-indigo-50 border-indigo-500 text-indigo-700' 
+                              : 'bg-slate-50 border-transparent hover:border-slate-200 text-slate-600'
+                          } ${
+                            submitted && opt === q.answer ? 'bg-green-50 border-green-500 text-green-700' : ''
+                          } ${
+                            submitted && quizResults[i] === opt && opt !== q.answer ? 'bg-red-50 border-red-500 text-red-700' : ''
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            <button 
-              onClick={handleQuizSubmit}
-              disabled={submitted || Object.keys(quizResults).length < (lesson?.quiz?.length || 0)}
-              className="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Check Answers
-            </button>
+                ))}
+                
+                <button 
+                  onClick={handleQuizSubmit}
+                  disabled={submitted || Object.keys(quizResults).length < (lesson?.quiz?.length || 0)}
+                  className="w-full mt-8 bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Check Answers
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Cultural Context Note */}

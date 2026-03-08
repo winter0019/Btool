@@ -112,6 +112,9 @@ export async function generateLesson(level: EducationLevel, subject: Subject, to
 
     const lessonData = JSON.parse(response.text || "{}");
     lessonData.provider = "gemini";
+    if (!Array.isArray(lessonData.quiz)) {
+      lessonData.quiz = [];
+    }
 
     // Generate images using OpenAI via backend
     try {

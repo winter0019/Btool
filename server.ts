@@ -30,10 +30,11 @@ app.post("/api/generate-images", async (req, res) => {
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        model: "dall-e-3",
         prompt,
         size: "1024x1024",
-        quality: "medium",
+        quality: "standard",
+        n: 1,
         response_format: "b64_json",
       }),
     });
@@ -42,7 +43,8 @@ app.post("/api/generate-images", async (req, res) => {
 
     if (!response.ok) {
       console.error("OpenAI API Error:", data);
-      return res.status(response.status).json(data);
+      const errorMessage = data?.error?.message || "OpenAI API Error";
+      return res.status(response.status).json({ error: errorMessage, details: data });
     }
 
     const b64 = data?.data?.[0]?.b64_json;
@@ -76,7 +78,16 @@ app.post("/api/lesson-fallback", async (req, res) => {
     const prompt = `You are an expert teacher for Nigerian students at the ${level} level. 
       Create a fun, interactive lesson on the topic: "${topic}" for the subject: "${subjectName}".
       Assistant: ${character.name}.
-      Return a JSON object with: title, content (Markdown), characterGreeting, cartoonDescription, interactiveDemo, and quiz.`;
+      Return a JSON object with:
+      - title: The lesson title
+      - content: Markdown content of the lesson
+      - characterGreeting: A friendly greeting from ${character.name}
+      - cartoonDescription: A description of a cartoon scene
+      - interactiveDemo: An idea for an interactive activity
+      - quiz: An array of 3 objects, each with:
+        - question: The question text
+        - options: An array of 4 multiple-choice options
+        - answer: The correct option string`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",

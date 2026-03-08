@@ -119,6 +119,7 @@ export const useCartoonMaskTracking = (
       const faces = await detector.estimateFaces(video, { flipHorizontal: false });
 
       if (!faces.length || !faces[0].keypoints?.length) {
+        if (isActive && Math.random() < 0.01) console.log('No face detected');
         setIsFaceDetected(false);
         smoothedRef.current.visible = false;
 
@@ -138,6 +139,7 @@ export const useCartoonMaskTracking = (
         return;
       }
 
+      if (isActive && !isFaceDetected) console.log('Face detected!');
       setIsFaceDetected(true);
       setShowLowLightWarning(false);
       setIsTooDark(false);
@@ -153,6 +155,7 @@ export const useCartoonMaskTracking = (
       const mouth = pts[MOUTH_CENTER_INDEX];
 
       if (!leftEye || !rightEye || !nose || !mouth || !maskImg) {
+        if (isActive && !maskImg && Math.random() < 0.01) console.log('Mask image missing in hook');
         requestRef.current = requestAnimationFrame(drawMask);
         return;
       }
