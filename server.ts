@@ -2,8 +2,12 @@ import express from "express";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -18,6 +22,10 @@ type LessonBody = {
   topic: string;
   character: { name: string; description?: string };
 };
+
+app.get("/", (_req, res) => {
+  res.send("Server is running");
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -337,18 +345,21 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-  app.use(express.static("dist"));
+    const distPath = path.join(__dirname, "dist");
+    const indexPath = path.join(distPath, "index.html");
 
-  app.get("*", (_req, res) => {
-    const indexPath = path.resolve("dist/index.html");
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        console.error("Failed to send dist/index.html:", err);
-        res.status(500).send("Frontend build not found.");
-      }
+    app.use(express.static(distPath));
+
+    app.get("*", (_req, res) => {
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error("Failed to send dist/index.html:", err);
+          res.status(500).send("Frontend build not found.");
+        }
+      });
     });
-  });
-}
+  }
+
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
