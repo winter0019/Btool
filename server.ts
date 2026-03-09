@@ -6,110 +6,323 @@ import path from "path";
 dotenv.config();
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: "50mb" }));
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
-// API Routes (Only OpenAI fallbacks if needed, but primary logic moved to frontend)
+type LessonBody = {
+  level: string;
+  subject: { name: string };
+  topic: string;
+  character: { name: string; description?: string };
+};
+
 app.post("/api/generate-images", async (req, res) => {
   try {
     const { prompt } = req.body;
 
-    if (!prompt) {
+    if (!prompt || typeof prompt !== "string") {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!openai) {
       return res.status(503).json({ error: "OpenAI API key not configured" });
     }
 
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "dall-e-3",
-        prompt,
-        size: "1024x1024",
-        quality: "standard",
-        n: 1,
-        response_format: "b64_json",
-      }),
+    const result = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt,
+      size: "1024x1024",
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("OpenAI API Error:", data);
-      const errorMessage = data?.error?.message || "OpenAI API Error";
-      return res.status(response.status).json({ error: errorMessage, details: data });
-    }
-
-    const b64 = data?.data?.[0]?.b64_json;
+    const b64 = result.data?.[0]?.b64_json;
 
     if (!b64) {
       return res.status(500).json({ error: "No image returned from OpenAI" });
     }
 
-    return res.status(200).json({
+    return res.json({
+      provider: "openai",
       imageBase64: b64,
       mimeType: "image/png",
-      provider: "openai",
     });
   } catch (error: any) {
-    console.error("OpenAI Image Generation Error:", error);
-    res.status(500).json({
-      error: "Cartoon generation failed",
-      message: error.message,
+    console.error("OpenAI image generation error:", error);
+    return res.status(error?.status || 500).json({
+      error: error?.message || "Cartoon generation failed",
     });
   }
 });
 
-app.post("/api/lesson-fallback", async (req, res) => {
+app.post("/api/lesson", async (req, res) => {
   try {
-    const { level, subjectName, topic, character } = req.body;
-    
-    if (!openai) {
-      return res.status(503).json({ error: "OpenAI fallback not configured" });
+    const { level, subject, topic, character } = req.body as LessonBody;
+
+    if (!level || !subject?.name || !topic || !character?.name) {
+      return res.status(400).json({ error: "Missing lesson fields" });
     }
 
-    const prompt = `You are an expert teacher for Nigerian students at the ${level} level. 
-      Create a fun, interactive lesson on the topic: "${topic}" for the subject: "${subjectName}".
-      Assistant: ${character.name}.
-      Return a JSON object with:
-      - title: The lesson title
-      - content: Markdown content of the lesson
-      - characterGreeting: A friendly greeting from ${character.name}
-      - cartoonDescription: A description of a cartoon scene
-      - interactiveDemo: An idea for an interactive activity
-      - quiz: An array of 3 objects, each with:
-        - question: The question text
-        - options: An array of 4 multiple-choice options
-        - answer: The correct option string`;
+    if (!openai) {
+      return res.status(503).json({ error: "OpenAI API key not configured" });
+    }
+
+    const lessonPrompt = `
+You are an expert teacher for Nigerian students at the ${level} level.
+
+Create a fun, educational, classroom-friendly lesson on:
+Topic: "${topic}"
+Subject: "${subject.name}"
+
+Teaching character:
+${character.name}${character.description ? ` - ${character.description}` : ""}
+
+Rules:
+- Use simple language suitable for children.
+- Use Nigerian examples where natural.
+- Keep it educational, clear, warm, and interactive.
+- Make the character sound like a friendly teaching buddy.
+- For Mathematics, make the examples visual and arithmetic-based.
+- For Science, make the examples observational and practical.
+
+Return valid JSON with:
+{
+  "title": string,
+  "content": string,
+  "characterGreeting": string,
+  "cartoonDescription": string,
+  "interactiveDemo": string,
+  "quiz": [
+    {
+      "question": string,
+      "options": string[],
+      "answer": string
+    }
+  ]
+}
+`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are a helpful educational assistant. Always respond in valid JSON." },
-        { role: "user", content: prompt }
+        {
+          role: "system",
+          content:
+            "You are a helpful educational assistant. Return only valid JSON.",
+        },
+        {
+          role: "user",
+          content: lessonPrompt,
+        },
       ],
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
     });
-    
-    const lessonData = JSON.parse(completion.choices[0].message.content || "{}");
-    res.json({ provider: "openai", ...lessonData });
+
+    const raw = completion.choices[0]?.message?.content || "{}";
+    const lessonData = JSON.parse(raw);
+
+    if (!Array.isArray(lessonData.quiz)) {
+      lessonData.quiz = [];
+    }
+
+    const subjectIsMath = subject.name.toLowerCase().includes("math");
+
+    const scenePrompt = subjectIsMath
+      ? `Create a bright educational cartoon scene for primary or junior school students in Nigeria.
+Topic: ${lessonData.title}.
+Character: ${character.name}.
+Show clear arithmetic visuals with large visible numbers and counted objects such as oranges, apples, books, balls, or farm produce.
+Scene description: ${lessonData.cartoonDescription}.
+Style: modern 3D cartoon, colorful, child-safe, educational, friendly.`
+      : `Create a bright educational cartoon scene for Nigerian pupils.
+Topic: ${lessonData.title}.
+Character: ${character.name}.
+Scene description: ${lessonData.cartoonDescription}.
+Style: modern 3D cartoon, colorful, child-safe, educational, friendly.`;
+
+    const characterPrompt = `Create a clean cartoon portrait of ${character.name}.
+${character.description ? `Description: ${character.description}.` : ""}
+Style: friendly, child-safe, 3D cartoon, centered face, plain background, suitable for a cartoon mask or avatar.`;
+
+    let cartoonImageUrl = "";
+    let characterImageUrl = "";
+
+    try {
+      const [sceneImage, characterImage] = await Promise.all([
+        openai.images.generate({
+          model: "gpt-image-1",
+          prompt: scenePrompt,
+          size: "1024x1024",
+        }),
+        openai.images.generate({
+          model: "gpt-image-1",
+          prompt: characterPrompt,
+          size: "1024x1024",
+        }),
+      ]);
+
+      const sceneB64 = sceneImage.data?.[0]?.b64_json;
+      const charB64 = characterImage.data?.[0]?.b64_json;
+
+      if (sceneB64) {
+        cartoonImageUrl = `data:image/png;base64,${sceneB64}`;
+      }
+
+      if (charB64) {
+        characterImageUrl = `data:image/png;base64,${charB64}`;
+      }
+    } catch (imgErr) {
+      console.error("Lesson image generation failed:", imgErr);
+    }
+
+    return res.json({
+      provider: "openai",
+      ...lessonData,
+      cartoonImageUrl,
+      characterImageUrl,
+    });
   } catch (error: any) {
-    console.error("OpenAI Fallback Error:", error);
-    res.status(error.status || 500).json({ error: error.message });
+    console.error("Lesson generation failed:", error);
+    return res.status(error?.status || 500).json({
+      error: error?.message || "Failed to generate lesson",
+    });
+  }
+});
+
+app.post("/api/speech", async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({ error: "Text is required" });
+    }
+
+    if (!openai) {
+      return res.status(503).json({ error: "OpenAI API key not configured" });
+    }
+
+    const speech = await openai.audio.speech.create({
+      model: "gpt-4o-mini-tts",
+      voice: "alloy",
+      input: `Say clearly and cheerfully for a student: ${text}`,
+    });
+
+    const buffer = Buffer.from(await speech.arrayBuffer());
+    const base64Audio = buffer.toString("base64");
+
+    return res.json({
+      provider: "openai",
+      audioUrl: `data:audio/mpeg;base64,${base64Audio}`,
+    });
+  } catch (error: any) {
+    console.error("Speech generation failed:", error);
+    return res.status(error?.status || 500).json({
+      error: error?.message || "Failed to generate speech",
+    });
+  }
+});
+
+app.post("/api/analyze-voice", async (req, res) => {
+  try {
+    const { userInput, context, characterName } = req.body;
+
+    if (!openai) {
+      return res.status(503).json({ error: "OpenAI API key not configured" });
+    }
+
+    const prompt = `
+The student said: "${userInput}".
+Lesson context: "${context}".
+Character teaching: "${characterName}".
+
+Evaluate:
+- whether the answer is correct
+- a gentle correction if needed
+- a helpful hint
+- pronunciation feedback
+- clarity score from 0 to 100
+- strengths
+- improvements
+- future hints
+
+Return valid JSON:
+{
+  "isCorrect": boolean,
+  "feedback": string,
+  "hint": string,
+  "pronunciationFeedback": string,
+  "clarityScore": number,
+  "strengths": string,
+  "improvements": string,
+  "futureHints": string
+}
+`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Return only valid JSON." },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    return res.json(JSON.parse(completion.choices[0]?.message?.content || "{}"));
+  } catch (error: any) {
+    console.error("Voice analysis failed:", error);
+    return res.status(error?.status || 500).json({
+      error: error?.message || "Failed to analyze voice",
+    });
+  }
+});
+
+app.post("/api/analyze-visual", async (req, res) => {
+  try {
+    const { characterName, context } = req.body;
+
+    if (!openai) {
+      return res.status(503).json({ error: "OpenAI API key not configured" });
+    }
+
+    const prompt = `
+Analyze a student's visual practice session.
+
+Character: "${characterName}"
+Lesson context: "${context}"
+
+Return valid JSON:
+{
+  "actingScore": number,
+  "emotion": string,
+  "feedback": string,
+  "strengths": string,
+  "improvements": string,
+  "futureHints": string
+}
+`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Return only valid JSON." },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    return res.json(JSON.parse(completion.choices[0]?.message?.content || "{}"));
+  } catch (error: any) {
+    console.error("Visual analysis failed:", error);
+    return res.status(error?.status || 500).json({
+      error: error?.message || "Failed to analyze visual practice",
+    });
   }
 });
 
 async function startServer() {
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
-  // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
@@ -118,10 +331,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Serve static files from dist in production
     app.use(express.static("dist"));
-    
-    // SPA fallback for production
     app.get("*", (req, res) => {
       res.sendFile(path.resolve("dist/index.html"));
     });
