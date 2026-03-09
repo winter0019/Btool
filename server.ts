@@ -8,7 +8,7 @@ dotenv.config();
 const app = express();
 app.use(express.json({ limit: "50mb" }));
 
-const openai = process.env.OPENAI_API_KEY
+const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
@@ -19,6 +19,13 @@ type LessonBody = {
   character: { name: string; description?: string };
 };
 
+app.get("/api/health", (_req, res) => {
+  res.json({
+    ok: true,
+    hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY),
+  });
+});
+
 app.post("/api/generate-images", async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -27,11 +34,11 @@ app.post("/api/generate-images", async (req, res) => {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    if (!openai) {
+    if (!openaiClient) {
       return res.status(503).json({ error: "OpenAI API key not configured" });
     }
 
-    const result = await openai.images.generate({
+    const result = await openaiClient.images.generate({
       model: "gpt-image-1",
       prompt,
       size: "1024x1024",
@@ -64,7 +71,7 @@ app.post("/api/lesson", async (req, res) => {
       return res.status(400).json({ error: "Missing lesson fields" });
     }
 
-    if (!openai) {
+    if (!openaiClient) {
       return res.status(503).json({ error: "OpenAI API key not configured" });
     }
 
@@ -103,13 +110,12 @@ Return valid JSON with:
 }
 `;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await openaiClient.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content:
-            "You are a helpful educational assistant. Return only valid JSON.",
+          content: "You are a helpful educational assistant. Return only valid JSON.",
         },
         {
           role: "user",
@@ -150,12 +156,12 @@ Style: friendly, child-safe, 3D cartoon, centered face, plain background, suitab
 
     try {
       const [sceneImage, characterImage] = await Promise.all([
-        openai.images.generate({
+        openaiClient.images.generate({
           model: "gpt-image-1",
           prompt: scenePrompt,
           size: "1024x1024",
         }),
-        openai.images.generate({
+        openaiClient.images.generate({
           model: "gpt-image-1",
           prompt: characterPrompt,
           size: "1024x1024",
@@ -198,11 +204,11 @@ app.post("/api/speech", async (req, res) => {
       return res.status(400).json({ error: "Text is required" });
     }
 
-    if (!openai) {
+    if (!openaiClient) {
       return res.status(503).json({ error: "OpenAI API key not configured" });
     }
 
-    const speech = await openai.audio.speech.create({
+    const speech = await openaiClient.audio.speech.create({
       model: "gpt-4o-mini-tts",
       voice: "alloy",
       input: `Say clearly and cheerfully for a student: ${text}`,
@@ -227,7 +233,7 @@ app.post("/api/analyze-voice", async (req, res) => {
   try {
     const { userInput, context, characterName } = req.body;
 
-    if (!openai) {
+    if (!openaiClient) {
       return res.status(503).json({ error: "OpenAI API key not configured" });
     }
 
@@ -259,7 +265,7 @@ Return valid JSON:
 }
 `;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await openaiClient.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "Return only valid JSON." },
@@ -281,7 +287,7 @@ app.post("/api/analyze-visual", async (req, res) => {
   try {
     const { characterName, context } = req.body;
 
-    if (!openai) {
+    if (!openaiClient) {
       return res.status(503).json({ error: "OpenAI API key not configured" });
     }
 
@@ -302,7 +308,7 @@ Return valid JSON:
 }
 `;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await openaiClient.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "Return only valid JSON." },
@@ -332,16 +338,19 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static("dist"));
-    app.get("*", (req, res) => {
+    app.get("*", (_req, res) => {
       res.sendFile(path.resolve("dist/index.html"));
     });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error("Server startup failed:", err);
+  process.exit(1);
+});
 
 export { app };
